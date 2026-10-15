@@ -3,6 +3,8 @@
 Phạm vi quét: `app/**` (models, repositories, services, workers, api, startup), `scripts/**`, `tests/**`, `a.py`, `run_server.py`.
 Phương pháp: AST import graph của toàn bộ `app/` + grep `__tablename__`, `ForeignKey`, `relationship`, `text(...)`, `execute(...)`, SQL thô.
 
+> **Phase 2 (đã xong):** đã xóa `Entity`, `EntityContext`, `EntityRelationship` khỏi source cùng toàn bộ router, service và repository GraphRAG. Sau khi import tất cả model, `Base.metadata` còn 37 bảng, không còn bảng hay FK nào trỏ tới `entities*`.
+
 Kết quả quan trọng trước khi đọc bảng:
 
 - **Không có Alembic và không có file `.sql` nào trong source.** `CODEBASE_STRUCTURE.md` có nhắc `alembic/`, nhưng thư mục này không tồn tại. Schema DB cũ được tạo ngoài repo, nên không có "migration lịch sử" để đối chiếu.

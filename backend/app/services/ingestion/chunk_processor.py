@@ -18,6 +18,8 @@ class ChunkProcessor:
 
         chunk: dict,
 
+        write_review_file: bool = True,
+
     ):
         
         
@@ -104,6 +106,10 @@ class ChunkProcessor:
         # --------------------------
         # Review File
         # --------------------------
+
+        if not write_review_file:
+
+            return result
 
         with open(
 

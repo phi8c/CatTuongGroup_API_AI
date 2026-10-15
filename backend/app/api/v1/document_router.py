@@ -57,9 +57,6 @@ from app.repositories.workspace_source_config_repository import (
 from app.services.delta.delta_service import (
    DeltaService
 )
-from app.services.knowledge.graph_ingestion_service import (
-    GraphIngestionService
-)
 
 from app.services.task.tracking_task_service import ( TrackingTaskService )
 
@@ -71,8 +68,6 @@ from app.core.database import (
     get_db,
     AsyncSessionLocal
 )
-
-import json
 
 from app.schemas.tracking_chat_request import TrackingChatRequest
 from app.services.govern.executive_data_sync_service import ExecutiveDataSyncService
@@ -385,19 +380,77 @@ async def sync_completed(
     )
     
     
-    body = await request.json()
+    try:
 
-    parent_id = body.get(
-        "parent_id"
+        body = await request.json()
+
+    except ValueError:
+
+        body = {}
+
+    parent_id = (
+        body.get("parent_id")
+        if isinstance(body, dict)
+        else None
     )
 
-    asyncio.create_task(
+    if not parent_id:
 
-        run_post_ingestion_pipeline(
-          
+        print(
+            "sync-completed: missing parent_id, skip pipeline"
+        )
+
+        _finish_sync(
+            failed=True,
+        )
+
+        return {
+
+            "status":
+            "ignored",
+
+            "reason":
+            "missing parent_id"
+
+        }
+
+    #
+    # Logic App có thể gọi lại callback cho cùng parent_id
+    # khi pipeline trước còn đang chạy.
+    #
+
+    if parent_id in _running_parent_ids:
+
+        print(
+            "sync-completed: already running =",
             parent_id
         )
 
+        return {
+
+            "status":
+            "accepted"
+
+        }
+
+    _running_parent_ids.add(
+        parent_id
+    )
+
+    task = asyncio.create_task(
+
+        run_post_ingestion_pipeline(
+
+            parent_id
+
+        )
+
+    )
+
+    _pipeline_tasks.add(task)
+
+    task.add_done_callback(
+        _pipeline_tasks.discard
     )
 
     return {
@@ -406,90 +459,130 @@ async def sync_completed(
         "accepted"
 
     }
-    
-    
-    
-async def run_post_ingestion_pipeline(
-    
-    parent_id: str
+
+
+#
+# Post-ingestion state (in-process)
+#
+
+_running_parent_ids: set[str] = set()
+
+_pipeline_tasks: set[asyncio.Task] = set()
+
+_failed_in_batch = False
+
+
+def _finish_sync(
+    failed: bool,
 ):
-    
-    async with (
-        AsyncSessionLocal()
-    ) as db:
-    
-    
 
-        open(
-            "review_chunks.json",
-            "w",
-            encoding="utf-8"
-        ).close()
+    global _failed_in_batch
 
-        chunks = (
+    if failed:
+
+        _failed_in_batch = True
+
+    #
+    # Chỉ chốt trạng thái khi không còn pipeline nào đang chạy
+    #
+
+    if _running_parent_ids:
+
+        return
+
+    SyncState.status = (
+        "FAILED"
+        if _failed_in_batch
+        else "COMPLETED"
+    )
+
+    _failed_in_batch = False
+
+
+def _normalize_sensitivity(
+    value,
+) -> int:
+
+    try:
+
+        sensitivity = int(value)
+
+    except (TypeError, ValueError):
+
+        return 2
+
+    if sensitivity not in (1, 2, 3):
+
+        return 2
+
+    return sensitivity
+
+
+async def run_post_ingestion_pipeline(
+
+    parent_id: str
+
+):
+
+    failed = False
+
+    try:
+
+        chunks = await asyncio.to_thread(
 
             ChunkRepository
-            .get_unprocessed_chunks(parent_id)
+            .get_unprocessed_chunks,
+
+            parent_id,
 
         )
-        title = chunks[0]["title"]
 
-        for chunk in chunks:
+        if not chunks:
 
-            await (
-
-                ChunkProcessor
-                .process_chunk(
-
-                    db=db,
-
-                    chunk=chunk
-
-                )
-
+            print(
+                "post-ingestion: no chunks for parent_id =",
+                parent_id
             )
+
+            return
 
         updated = 0
 
-        with open(
-            "review_chunks.json",
-            encoding="utf-8"
-        ) as f:
+        async with (
+            AsyncSessionLocal()
+        ) as db:
 
-            for line in f:
+            for chunk in chunks:
 
-                row = json.loads(
-                    line
-                )
-                
                 try:
 
-                    sensitivity = int(
-                        row["sensitivity"]
+                    result = await (
+
+                        ChunkProcessor
+                        .process_chunk(
+
+                            db=db,
+
+                            chunk=chunk,
+
+                            write_review_file=False,
+
+                        )
+
                     )
 
-                    if sensitivity not in [
-                        1,
-                        2,
-                        3
-                    ]:
+                    await asyncio.to_thread(
 
-                        sensitivity = 2
-
-                except:
-
-                    sensitivity = 2
-
-                try:
-
-                    AzureChunkRepository\
-                    .update_sensitivity(
+                        AzureChunkRepository
+                        .update_sensitivity,
 
                         chunk_id=
-                        row["id"],
+                        result["id"],
 
-                        sensitivity=sensitivity
-                        
+                        sensitivity=
+                        _normalize_sensitivity(
+                            result["sensitivity"]
+                        ),
 
                     )
 
@@ -497,57 +590,41 @@ async def run_post_ingestion_pipeline(
 
                 except Exception as e:
 
+                    failed = True
+
                     print(
-                        "push sensitivity error =",
+                        "post-ingestion chunk error =",
+                        chunk.get("id"),
                         e
                     )
-        open(
-        "review_chunks.json",
-        "w",
-        encoding="utf-8"
-        
-    ).close()
-        
-        if title:
-
-            print(
-                f"START GRAPH BUILD: {title}"
-            )
-
-            try:
-
-                await (
-                    GraphIngestionService
-                    .ingest_document(
-
-                        db=db,
-
-                        title=title
-                    )
-                )
-
-                print(
-                    f"GRAPH BUILD SUCCESS: {title}"
-                )
-
-            except Exception as e:
-
-                print(
-                    f"GRAPH BUILD ERROR: {e}"
-                )
-            
-        
-        
-        SyncState.status = (
-        "COMPLETED"
-    )
-        
 
         print(
             "updated chunks =",
-            updated
+            updated,
+            "/",
+            len(chunks)
         )
-        
+
+    except Exception as e:
+
+        failed = True
+
+        print(
+            "post-ingestion error =",
+            parent_id,
+            e
+        )
+
+    finally:
+
+        _running_parent_ids.discard(
+            parent_id
+        )
+
+        _finish_sync(
+            failed=failed,
+        )
+
 @router.get("/sites")
 async def get_sites():
 
