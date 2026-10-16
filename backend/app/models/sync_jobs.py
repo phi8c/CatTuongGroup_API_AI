@@ -12,7 +12,7 @@ from sqlalchemy.orm import (
     mapped_column
 )
 
-from app.core.database.models.base import (
+from app.core.database import (
     Base
 )
 

@@ -1,84 +1,57 @@
-from fastapi import (
-
-    APIRouter,
-
-    Depends
-
-)
-from fastapi.responses import StreamingResponse
-
-from sqlalchemy.ext.asyncio import (
-
-    AsyncSession
-
-)
-
-from app.core.database import (
-
-    get_db
-
-)
+import json
 
 from uuid import uuid4
 
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+)
+
+from fastapi.responses import StreamingResponse
+
+from sqlalchemy.ext.asyncio import (
+    AsyncSession
+)
+
+from app.core.database import (
+    get_db
+)
+
 from app.schemas.chat_schema import (
-
     ChatRequest,
-
-    ChatResponse
-
 )
 
 from app.services.azure.azure_search_service import (
-
     AzureSearchService
-
 )
 
 from app.services.rag.rag_service import (
     RagService
 )
 
-from app.services.message.message_service import (
-
- MessageService
-
+from app.enums.prompt_code import (
+    PromptCode
 )
 
-from app.services.session_memory.session_memory_service import (
-
- SessionMemoryService
-
-)
-from app.services.session_memory.conversation_summary_service import (
-    ConversationSummaryService
+from app.services.rag.chat_config_cache import (
+    ChatConfigCache
 )
 
-from app.services.rewrite_service.query_rewrite_service import (
-    QueryRewriteService
-)
-from app.services.conversation.conversation_service import (
-    ConversationService
-)
 
-from app.repositories.conversation_repository import (
-    ConversationRepository
-)
-from app.enums.prompt_code import ( PromptCode
-)
-
-import json
-
-from app.repositories.rag_config_repository import WorkspaceConfigRepository
 router = APIRouter(
-
-    prefix=
-    "/chat",
-
-    tags=
-    ["Chat"]
-
+    prefix="/chat",
+    tags=["Chat"],
 )
+
+
+#
+# top_k mặc định khi workspace chưa có rag config
+#
+
+CHAT_RAG_DEFAULT_TOP_K = 10
+
+HELPDESK_DEFAULT_TOP_K = 20
 
 
 def sse_event(
@@ -269,412 +242,167 @@ def parse_public_answer(
         )
 
 
-from app.services.message.message_service import (
-
- MessageService
-
-)
-
-
-@router.post(
-
- "/query"
-
-)
-
-async def query(
-
- body:ChatRequest,
-
- db:AsyncSession
-
- =
-
- Depends(
-
-  get_db
-
- )
-
-):
-
-
- if body.conversation_id is None:
-    body.conversation_id = uuid4()
-
- conversation = await ConversationRepository.get_by_id(
-        db=db,
-        conversation_id=body.conversation_id,
-    )
-
- if conversation is None:
-    await ConversationService.create(
-        db=db,
-        conversation_id=body.conversation_id,
-        title=body.question,
-        email=None,
-    )
-
-#  retrieval_query = await (
-#      SessionMemoryService
-#      .build_retrieval_query(
-#          db=db,
-#          conversation_id=body.conversation_id,
-#          question = body.question
-#      )
-#  )
-
-
-
- history = await (
-        SessionMemoryService
-        .build_context(
-            db=db,
-            conversation_id=body.conversation_id
-        )
-    )
- retrieval_query = await (
-    QueryRewriteService
-    .rewrite(
-        history=history,
-        question=body.question
-    )
-)
- print(
-    "rewritten query =",
-    retrieval_query
-)
- 
-#  print("in ra retrieval", retrieval_query)
- chunks = []
- if body.mode != PromptCode.PUBLIC:
-
-    chunks = await AzureSearchService.retrieve(
-        question=body.question,
-        user_object_id=body.microsoft_object_id,
-        group_ids=body.group_ids,
-    )
-
-
-
- 
-
-
- # =======
-
- # SAVE USER
-
- # =======
-
- await (
-
-  MessageService
-
-  .create(
-
-   db,
-
-   {
-
-    "conversation_id":
-
-    body.conversation_id,
-
-    "role":
-
-    "user",
-
-    "content":
-
-    body.question
-
-   }
-
-  )
-
- )
-
-
- rag_service = (
-
-  RagService()
-
- )
- 
- workscpace_code = PromptCode.CHAT_RAG.value
-
-
- sources = (
-    None
-    if body.mode == PromptCode.PUBLIC
-    else build_internal_sources(chunks)
- )
-
- async def stream_response():
-
-    raw_answer = ""
-    full_answer = ""
-    final_sources = sources
-    public_parser = (
-        PublicAnswerStreamParser()
-        if body.mode == PromptCode.PUBLIC
-        else None
-    )
-
-    yield sse_event(
-        "metadata",
-        {
-            "conversation_id": str(body.conversation_id),
-            "title": str(body.question),
-            "sources": final_sources,
-        },
-    )
-
-    async for token in rag_service.ask_stream(
-        db=db,
-        conversation_id=body.conversation_id,
-        question=body.question,
-        chunks=chunks,
-        model_id=body.model_id,
-        mode=body.mode,
-        workspace_code=workscpace_code,
-    ):
-
-        raw_answer += token
-
-        answer_delta = token
-
-        if public_parser is not None:
-
-            answer_delta = public_parser.feed(token)
-
-        if answer_delta:
-
-            full_answer += answer_delta
-
-            yield sse_event(
-                "answer",
-                {
-                    "delta": answer_delta,
-                },
-            )
-
-    if body.mode == PromptCode.PUBLIC:
-
-        full_answer, final_sources = parse_public_answer(
-            raw_answer=raw_answer,
-            streamed_answer=full_answer,
-        )
-
-        yield sse_event(
-            "metadata",
-            {
-                "conversation_id": str(body.conversation_id),
-                "title": str(body.question),
-                "sources": final_sources,
-            },
-        )
-
-    await (
-        MessageService
-        .create(
-            db,
-            {
-                "conversation_id": body.conversation_id,
-                "role": "assistant",
-                "content": full_answer,
-            }
-        )
-    )
-
-    yield sse_event(
-        "done",
-        {
-            "conversation_id": str(body.conversation_id),
-            "title": str(body.question),
-            "answer": full_answer,
-            "sources": final_sources,
-        },
-    )
-
- return StreamingResponse(
-    stream_response(),
-    media_type="text/event-stream",
-    headers={
-        "Cache-Control": "no-cache",
-        "X-Accel-Buffering": "no",
-    },
-)
- 
- 
-@router.post("/helpdesk")
-async def helpdesk_query(
-
+async def stream_chat(
     body: ChatRequest,
+    db: AsyncSession,
+    workspace_code: str,
+    default_top_k: int,
+    retrieve,
+) -> StreamingResponse:
 
-    db: AsyncSession = Depends(
-        get_db,
-    ),
+    #
+    # Chat không tạo/cập nhật conversation hay message trong DB.
+    # conversation_id do webapp quản lý, chỉ trả lại trong event.
+    #
 
-):
-
-    if body.conversation_id is None:
-
-        body.conversation_id = uuid4()
-
-    conversation = await (
-        ConversationRepository.get_by_id(
-            db=db,
-            conversation_id=body.conversation_id,
-        )
+    conversation_id = str(
+        body.conversation_id or uuid4()
     )
 
-    if conversation is None:
-
-        await ConversationService.create(
-            db=db,
-            conversation_id=body.conversation_id,
-            title=body.question,
-            email=None,
-        )
-
-    history = await (
-        SessionMemoryService
-        .build_context(
-            db=db,
-            conversation_id=body.conversation_id,
-        )
-    )
-
-    retrieval_query = await (
-        QueryRewriteService
-        .rewrite(
-            history=history,
-            question=body.question,
-        )
-    )
-
-    print(
-        "rewritten query =",
-        retrieval_query,
-    )
-
-    # ======================================
-    # HELPDESK RETRIEVAL
-    # ======================================
-    
-    top_k = await (
-    WorkspaceConfigRepository
-    .get_top_k_by_workspace_code(
-
-        db=db,
-
-        workspace_code=
-        PromptCode.HELPDESK.value,
-
-    )
-)
-
-    chunks = []
-
-    if body.mode != PromptCode.PUBLIC:
-
-        chunks = AzureSearchService.retrieve_helpdesk(
-            question=retrieval_query,
-            top_k=top_k,
-            user_object_id=body.microsoft_object_id,
-            group_ids=body.group_ids,
-        )
-
-    # ======================================
-    # SAVE USER
-    # ======================================
-
-    await (
-
-        MessageService
-        .create(
-
-            db,
-
-            {
-
-                "conversation_id":
-                body.conversation_id,
-
-                "role":
-                "user",
-
-                "content":
-                body.question,
-
-            }
-
-        )
-
-    )
+    is_public = body.mode == PromptCode.PUBLIC
 
     rag_service = RagService()
-    
-    
-    workscpace_code = PromptCode.HELPDESK.value
 
-    sources = (
-        None
-        if body.mode == PromptCode.PUBLIC
-        else build_internal_sources(chunks)
+    #
+    # Kiểm tra trước khi stream: cấu hình đọc từ cache trong RAM
+    # (không chạm DB), nên lỗi vẫn trả 400/404 mà gần như không tốn thời gian.
+    #
+
+    try:
+
+        chat_config = await rag_service.load_chat_config(
+            db=db,
+            model_id=body.model_id,
+            mode=body.mode,
+            workspace_code=workspace_code,
+        )
+
+        if not is_public:
+
+            AzureSearchService.build_acl_filter(
+                user_object_id=body.microsoft_object_id,
+                group_ids=body.group_ids,
+            )
+
+    except ValueError as exc:
+
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        ) from exc
+
+    except LookupError as exc:
+
+        raise HTTPException(
+            status_code=404,
+            detail=str(exc),
+        ) from exc
+
+    top_k = (
+        await ChatConfigCache.get_top_k(workspace_code)
+        or default_top_k
     )
 
     async def stream_response():
 
         raw_answer = ""
         full_answer = ""
-        final_sources = sources
+        chunks = []
+        final_sources = None
         public_parser = (
             PublicAnswerStreamParser()
-            if body.mode == PromptCode.PUBLIC
+            if is_public
             else None
         )
+
+        #
+        # Retrieval chạy bên trong stream để header HTTP được trả ngay
+        #
+
+        if not is_public:
+
+            try:
+
+                chunks = await retrieve(
+                    question=body.question,
+                    top_k=top_k,
+                    user_object_id=body.microsoft_object_id,
+                    group_ids=body.group_ids,
+                )
+
+            except Exception as exc:
+
+                print(
+                    "chat retrieval error =",
+                    repr(exc),
+                )
+
+                yield sse_event(
+                    "error",
+                    {
+                        "conversation_id": conversation_id,
+                        "message": "Failed to retrieve documents.",
+                    },
+                )
+
+                return
+
+            final_sources = build_internal_sources(chunks)
 
         yield sse_event(
             "metadata",
             {
-                "conversation_id": str(body.conversation_id),
+                "conversation_id": conversation_id,
                 "title": body.question,
                 "sources": final_sources,
             },
         )
 
-        async for token in rag_service.ask_stream(
-            db=db,
-            conversation_id=body.conversation_id,
-            question=body.question,
-            chunks=chunks,
-            model_id=body.model_id,
-            mode=body.mode,
-            workspace_code=workscpace_code,
-        ):
+        try:
 
-            raw_answer += token
+            async for token in rag_service.ask_stream(
+                chat_config=chat_config,
+                question=body.question,
+                chunks=chunks,
+            ):
 
-            answer_delta = token
+                raw_answer += token
 
-            if public_parser is not None:
+                answer_delta = token
 
-                answer_delta = public_parser.feed(token)
+                if public_parser is not None:
 
-            if answer_delta:
+                    answer_delta = public_parser.feed(token)
 
-                full_answer += answer_delta
+                if answer_delta:
 
-                yield sse_event(
-                    "answer",
-                    {
-                        "delta": answer_delta,
-                    },
-                )
+                    full_answer += answer_delta
 
-        if body.mode == PromptCode.PUBLIC:
+                    yield sse_event(
+                        "answer",
+                        {
+                            "delta": answer_delta,
+                        },
+                    )
+
+        except Exception as exc:
+
+            print(
+                "chat stream error =",
+                repr(exc),
+            )
+
+            yield sse_event(
+                "error",
+                {
+                    "conversation_id": conversation_id,
+                    "message": "Failed to generate answer.",
+                },
+            )
+
+            return
+
+        if is_public:
 
             full_answer, final_sources = parse_public_answer(
                 raw_answer=raw_answer,
@@ -684,28 +412,16 @@ async def helpdesk_query(
             yield sse_event(
                 "metadata",
                 {
-                    "conversation_id": str(body.conversation_id),
+                    "conversation_id": conversation_id,
                     "title": body.question,
                     "sources": final_sources,
                 },
             )
 
-        await (
-            MessageService
-            .create(
-                db,
-                {
-                    "conversation_id": body.conversation_id,
-                    "role": "assistant",
-                    "content": full_answer,
-                }
-            )
-        )
-
         yield sse_event(
             "done",
             {
-                "conversation_id": str(body.conversation_id),
+                "conversation_id": conversation_id,
                 "title": body.question,
                 "answer": full_answer,
                 "sources": final_sources,
@@ -719,4 +435,38 @@ async def helpdesk_query(
             "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no",
         },
+    )
+
+
+@router.post("/query")
+async def query(
+    body: ChatRequest,
+    db: AsyncSession = Depends(
+        get_db,
+    ),
+):
+
+    return await stream_chat(
+        body=body,
+        db=db,
+        workspace_code=PromptCode.CHAT_RAG.value,
+        default_top_k=CHAT_RAG_DEFAULT_TOP_K,
+        retrieve=AzureSearchService.retrieve,
+    )
+
+
+@router.post("/helpdesk")
+async def helpdesk_query(
+    body: ChatRequest,
+    db: AsyncSession = Depends(
+        get_db,
+    ),
+):
+
+    return await stream_chat(
+        body=body,
+        db=db,
+        workspace_code=PromptCode.HELPDESK.value,
+        default_top_k=HELPDESK_DEFAULT_TOP_K,
+        retrieve=AzureSearchService.retrieve_helpdesk,
     )

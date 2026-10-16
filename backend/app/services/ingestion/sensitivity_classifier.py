@@ -1,4 +1,3 @@
-from click import prompt
 from sqlalchemy.ext.asyncio import (
     AsyncSession
 )
@@ -11,9 +10,6 @@ from app.services.prompt.prompt_builder import (
     PromptBuilder
 )
 
-from app.services.llm.llm_factory import (
-    LLMFactory
-)
 
 from app.services.llm.azure_openai_service import (
     AzureOpenAIService,

@@ -148,10 +148,10 @@ class ContractAdvancedRouterTest(unittest.IsolatedAsyncioTestCase):
                 db=None,
             )
 
-        self.assertIsInstance(result, StreamingResponse)
-        body = "".join(
-            [chunk async for chunk in result.body_iterator]
-        )
+            self.assertIsInstance(result, StreamingResponse)
+            body = "".join(
+                [chunk async for chunk in result.body_iterator]
+            )
         self.assertEqual(
             calls,
             [{

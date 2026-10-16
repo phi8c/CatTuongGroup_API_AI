@@ -1,0 +1,667 @@
+{
+  "app\\api\\v1\\chat_router.py": [
+    "app.core.database",
+    "app.enums.prompt_code",
+    "app.repositories.conversation_repository",
+    "app.repositories.rag_config_repository",
+    "app.schemas.chat_schema",
+    "app.services.azure.azure_search_service",
+    "app.services.conversation.conversation_service",
+    "app.services.message.message_service",
+    "app.services.rag.rag_service",
+    "app.services.rewrite_service.query_rewrite_service",
+    "app.services.session_memory.session_memory_service"
+  ],
+  "app\\api\\v1\\chunk_router.py": [
+    "app.core.database",
+    "app.repositories.azure_chunk_repository",
+    "app.repositories.chunk_repository",
+    "app.services.ingestion.chunk_processor"
+  ],
+  "app\\api\\v1\\contract_router.py": [
+    "app.core.contract_advanced_logging",
+    "app.core.database",
+    "app.schemas.contract_advanced_request",
+    "app.schemas.contract_chat_request",
+    "app.services.contract.contract_advanced_service",
+    "app.services.contract.contract_service",
+    "app.services.contract.legal_chat_service",
+    "app.services.contract.legal_contract_analysis_service"
+  ],
+  "app\\api\\v1\\conversation_router.py": [
+    "app.core.database",
+    "app.repositories.conversation_summary_repository",
+    "app.repositories.message_repository",
+    "app.schemas.conversation_schema",
+    "app.services.conversation.conversation_service"
+  ],
+  "app\\api\\v1\\document_router.py": [
+    "app.core.database",
+    "app.core.settings",
+    "app.repositories.azure_chunk_repository",
+    "app.repositories.chunk_repository",
+    "app.repositories.workspace_source_config_repository",
+    "app.schemas.tracking_chat_request",
+    "app.services.azure.preview_document_service",
+    "app.services.delta.delta_service",
+    "app.services.ingestion.chunk_processor",
+    "app.services.sharepoint.azure_project_tracking_service",
+    "app.services.sharepoint.project_tracking_reader_service",
+    "app.services.sharepoint.project_tracking_sync_service",
+    "app.services.sharepoint.sharepoint_service",
+    "app.services.sync_jobs.sync_state",
+    "app.services.task.tracking_task_service"
+  ],
+  "app\\api\\v1\\meeting_router.py": [
+    "app.core.database",
+    "app.schemas.analyze_meeting_request",
+    "app.services.azure.meeting_analysis_service",
+    "app.services.meeting.meeting_service"
+  ],
+  "app\\api\\v1\\model_router.py": [
+    "app.core.database",
+    "app.schemas.create_ai_model_request",
+    "app.schemas.get_ai_model_paged_request",
+    "app.schemas.update_ai_model_active_request",
+    "app.schemas.update_ai_model_request",
+    "app.services.llm.model_service"
+  ],
+  "app\\api\\v1\\prompt_router.py": [
+    "app.core.database",
+    "app.schemas.create_ai_prompt_request",
+    "app.schemas.get_ai_prompt_paged_request",
+    "app.schemas.update_ai_prompt_request",
+    "app.services.prompt.ai_prompt_service"
+  ],
+  "app\\api\\v1\\rag_config_router.py": [
+    "app.core.database",
+    "app.schemas.rag_config",
+    "app.services.rag_config.rag_config_service"
+  ],
+  "app\\api\\v1\\recruitment_candidate_router.py": [
+    "app.core.database",
+    "app.core.not_found_exception",
+    "app.core.settings",
+    "app.schemas.analyze_candidate_request",
+    "app.schemas.create_review_request",
+    "app.schemas.recruit_campaign_chat_request",
+    "app.schemas.recruitment_schema",
+    "app.schemas.review_dto",
+    "app.services.recruitment.analyze_candidate_service",
+    "app.services.recruitment.recruitment_campaign_service",
+    "app.services.recruitment.recruitment_service",
+    "app.services.recruitment.upload_candidate",
+    "app.services.review.review_service"
+  ],
+  "app\\api\\v1\\workspace_source_config_router.py": [
+    "app.core.database",
+    "app.schemas.workspace_schema",
+    "app.services.workspace.workspace_service"
+  ],
+  "app\\core\\bad_request_exception.py": [],
+  "app\\core\\contract_advanced_logging.py": [],
+  "app\\core\\database.py": [],
+  "app\\core\\not_found_exception.py": [],
+  "app\\core\\settings.py": [],
+  "app\\enums\\access_class.py": [],
+  "app\\enums\\memories.py": [],
+  "app\\enums\\prompt_code.py": [],
+  "app\\enums\\review_constants.py": [],
+  "app\\enums\\review_job_status.py": [],
+  "app\\enums\\review_queue.py": [],
+  "app\\enums\\review_task_status.py": [],
+  "app\\enums\\role.py": [],
+  "app\\enums\\temp_file_result.py": [],
+  "app\\main.py": [
+    "app.api.v1.chat_router",
+    "app.api.v1.chunk_router",
+    "app.api.v1.contract_router",
+    "app.api.v1.conversation_router",
+    "app.api.v1.document_router",
+    "app.api.v1.meeting_router",
+    "app.api.v1.model_router",
+    "app.api.v1.prompt_router",
+    "app.api.v1.rag_config_router",
+    "app.api.v1.recruitment_candidate_router",
+    "app.api.v1.workspace_source_config_router"
+  ],
+  "app\\models\\__init__.py": [],
+  "app\\models\\ai_model.py": [
+    "app.core.database"
+  ],
+  "app\\models\\ai_prompt.py": [
+    "app.core.database"
+  ],
+  "app\\models\\contract_dashboard.py": [
+    "app.core.database"
+  ],
+  "app\\models\\contract_raw.py": [
+    "app.core.database"
+  ],
+  "app\\models\\conversation.py": [
+    "app.core.database"
+  ],
+  "app\\models\\conversation_summary.py": [
+    "app.core.database"
+  ],
+  "app\\models\\data_source_mode.py": [
+    "app.core.database"
+  ],
+  "app\\models\\department.py": [
+    "app.core.database"
+  ],
+  "app\\models\\department_sensitivity_permission.py": [
+    "app.core.database"
+  ],
+  "app\\models\\document_type.py": [
+    "app.core.database"
+  ],
+  "app\\models\\embedding_model.py": [
+    "app.core.database"
+  ],
+  "app\\models\\executive_data_dashboard.py": [
+    "app.core.database"
+  ],
+  "app\\models\\executive_data_raw.py": [
+    "app.core.database"
+  ],
+  "app\\models\\master_config.py": [
+    "app.core.database"
+  ],
+  "app\\models\\meeting_analysis.py": [
+    "app.core.database"
+  ],
+  "app\\models\\meeting_transcript.py": [
+    "app.core.database"
+  ],
+  "app\\models\\messages.py": [
+    "app.core.database"
+  ],
+  "app\\models\\position_level.py": [
+    "app.core.database"
+  ],
+  "app\\models\\project_tracking_dashboard.py": [
+    "app.core.database"
+  ],
+  "app\\models\\project_tracking_raw.py": [
+    "app.core.database"
+  ],
+  "app\\models\\recruitment_campaign.py": [
+    "app.core.database"
+  ],
+  "app\\models\\recruitment_candidate.py": [
+    "app.core.database"
+  ],
+  "app\\models\\recruitment_candidate_result.py": [
+    "app.core.database"
+  ],
+  "app\\models\\review_job.py": [
+    "app.core.database",
+    "app.models.review_task"
+  ],
+  "app\\models\\review_task.py": [
+    "app.core.database",
+    "app.models.review_job"
+  ],
+  "app\\models\\role.py": [
+    "app.core.database"
+  ],
+  "app\\models\\sensitivity_level.py": [
+    "app.core.database"
+  ],
+  "app\\models\\sharepoint_delta_state.py": [
+    "app.core.database"
+  ],
+  "app\\models\\sync_jobs.py": [
+    "app.core.database"
+  ],
+  "app\\models\\tag.py": [
+    "app.core.database"
+  ],
+  "app\\models\\tag_role_rule.py": [
+    "app.core.database"
+  ],
+  "app\\models\\workspace.py": [
+    "app.core.database"
+  ],
+  "app\\models\\workspace_model_config.py": [
+    "app.core.database"
+  ],
+  "app\\models\\workspace_rag_config.py": [
+    "app.core.database"
+  ],
+  "app\\models\\workspace_source_config.py": [
+    "app.core.database"
+  ],
+  "app\\prompts\\sensitivity_prompt.py": [],
+  "app\\repositories\\ai_model_repository.py": [
+    "app.models.ai_model",
+    "app.schemas.get_ai_model_paged_request"
+  ],
+  "app\\repositories\\ai_prompt_repository.py": [
+    "app.enums.prompt_code",
+    "app.models.ai_prompt"
+  ],
+  "app\\repositories\\azure_chunk_repository.py": [
+    "app.core.settings"
+  ],
+  "app\\repositories\\chunk_repository.py": [
+    "app.repositories.azure_chunk_repository"
+  ],
+  "app\\repositories\\contract_repository.py": [
+    "app.models.contract_dashboard",
+    "app.models.contract_raw"
+  ],
+  "app\\repositories\\conversation_repository.py": [
+    "app.models.conversation"
+  ],
+  "app\\repositories\\conversation_summary_repository.py": [
+    "app.models.conversation_summary"
+  ],
+  "app\\repositories\\meeting_analysis_repository.py": [
+    "app.models.meeting_analysis"
+  ],
+  "app\\repositories\\meeting_transcript_repository.py": [
+    "app.models.meeting_transcript"
+  ],
+  "app\\repositories\\message_repository.py": [
+    "app.models.messages"
+  ],
+  "app\\repositories\\project_tracking_dashboard_repository.py": [
+    "app.models.project_tracking_dashboard"
+  ],
+  "app\\repositories\\project_tracking_raw_repository.py": [
+    "app.models.project_tracking_dashboard",
+    "app.models.project_tracking_raw"
+  ],
+  "app\\repositories\\rag_config_repository.py": [
+    "app.models.ai_model",
+    "app.models.embedding_model",
+    "app.models.master_config",
+    "app.models.workspace",
+    "app.models.workspace_model_config",
+    "app.models.workspace_rag_config"
+  ],
+  "app\\repositories\\recruitment_campaign_repository.py": [
+    "app.models.recruitment_campaign",
+    "app.models.review_job",
+    "app.models.review_task"
+  ],
+  "app\\repositories\\recruitment_candidate_repository.py": [
+    "app.models.recruitment_candidate"
+  ],
+  "app\\repositories\\recruitment_candidate_result_repository.py": [
+    "app.models.recruitment_candidate",
+    "app.models.recruitment_candidate_result"
+  ],
+  "app\\repositories\\review_job_repository.py": [
+    "app.models.review_job"
+  ],
+  "app\\repositories\\review_task_repository.py": [
+    "app.enums.review_task_status",
+    "app.models.review_task"
+  ],
+  "app\\repositories\\role_repository.py": [
+    "app.models.role"
+  ],
+  "app\\repositories\\sensitivity_repository.py": [
+    "app.models.sensitivity_level"
+  ],
+  "app\\repositories\\sharepoint_delta_state_repository.py": [
+    "app.models.sharepoint_delta_state"
+  ],
+  "app\\repositories\\sync_job_repository.py": [
+    "app.models.sync_jobs"
+  ],
+  "app\\repositories\\workspace_source_config_repository.py": [
+    "app.models.data_source_mode",
+    "app.models.document_type",
+    "app.models.workspace",
+    "app.models.workspace_source_config"
+  ],
+  "app\\review\\messages\\review_task_message.py": [],
+  "app\\schemas\\analyze_candidate_request.py": [],
+  "app\\schemas\\analyze_meeting_request.py": [],
+  "app\\schemas\\chat_schema.py": [
+    "app.enums.prompt_code"
+  ],
+  "app\\schemas\\contract_advanced_request.py": [],
+  "app\\schemas\\contract_chat_request.py": [],
+  "app\\schemas\\conversation_schema.py": [],
+  "app\\schemas\\create_ai_model_request.py": [],
+  "app\\schemas\\create_ai_prompt_request.py": [],
+  "app\\schemas\\create_review_request.py": [],
+  "app\\schemas\\get_ai_model_paged_request.py": [],
+  "app\\schemas\\get_ai_prompt_paged_request.py": [],
+  "app\\schemas\\message_schema.py": [],
+  "app\\schemas\\rag_config.py": [],
+  "app\\schemas\\recruit_campaign_chat_request.py": [],
+  "app\\schemas\\recruitment_schema.py": [],
+  "app\\schemas\\review_dto.py": [],
+  "app\\schemas\\tracking_chat_request.py": [],
+  "app\\schemas\\update_ai_model_active_request.py": [],
+  "app\\schemas\\update_ai_model_request.py": [],
+  "app\\schemas\\update_ai_prompt_request.py": [],
+  "app\\schemas\\workspace_schema.py": [],
+  "app\\services\\azure\\azure_search_service.py": [
+    "app.core.settings",
+    "app.enums.prompt_code",
+    "app.repositories.rag_config_repository",
+    "app.services.llm.azure_openai_service"
+  ],
+  "app\\services\\azure\\meeting_analysis_service.py": [
+    "app.core.settings",
+    "app.enums.prompt_code",
+    "app.models.meeting_analysis",
+    "app.models.meeting_transcript",
+    "app.repositories.ai_model_repository",
+    "app.repositories.ai_prompt_repository",
+    "app.repositories.meeting_analysis_repository",
+    "app.repositories.meeting_transcript_repository",
+    "app.services.azure.microsoft_meeting_service",
+    "app.services.llm.azure_openai_service"
+  ],
+  "app\\services\\azure\\microsoft_meeting_service.py": [
+    "app.core.settings"
+  ],
+  "app\\services\\azure\\preview_document_service.py": [
+    "app.core.settings"
+  ],
+  "app\\services\\contract\\company_policy_retrieval_service.py": [
+    "app.core.contract_advanced_logging",
+    "app.services.azure.azure_search_service"
+  ],
+  "app\\services\\contract\\contract_advanced_service.py": [
+    "app.core.contract_advanced_logging",
+    "app.enums.prompt_code",
+    "app.repositories.ai_model_repository",
+    "app.repositories.ai_prompt_repository",
+    "app.repositories.rag_config_repository",
+    "app.services.contract.company_policy_retrieval_service",
+    "app.services.contract.legal_retrieval_service",
+    "app.services.llm.azure_openai_service",
+    "app.utils.extract.document_intelligent"
+  ],
+  "app\\services\\contract\\contract_service.py": [
+    "app.core.settings",
+    "app.enums.prompt_code",
+    "app.models.contract_dashboard",
+    "app.models.contract_raw",
+    "app.repositories.ai_model_repository",
+    "app.repositories.ai_prompt_repository",
+    "app.repositories.contract_repository",
+    "app.repositories.rag_config_repository",
+    "app.services.llm.azure_openai_service",
+    "app.utils.extract.document_extraction"
+  ],
+  "app\\services\\contract\\legal_chat_retrieval_service.py": [
+    "app.core.settings"
+  ],
+  "app\\services\\contract\\legal_chat_service.py": [
+    "app.core.contract_advanced_logging",
+    "app.enums.prompt_code",
+    "app.repositories.ai_model_repository",
+    "app.repositories.ai_prompt_repository",
+    "app.repositories.rag_config_repository",
+    "app.services.contract.legal_chat_retrieval_service",
+    "app.services.llm.azure_openai_service"
+  ],
+  "app\\services\\contract\\legal_contract_analysis_service.py": [
+    "app.core.contract_advanced_logging",
+    "app.enums.prompt_code",
+    "app.repositories.ai_model_repository",
+    "app.repositories.ai_prompt_repository",
+    "app.repositories.rag_config_repository",
+    "app.services.contract.legal_chat_retrieval_service",
+    "app.services.llm.azure_openai_service"
+  ],
+  "app\\services\\contract\\legal_retrieval_service.py": [
+    "app.core.contract_advanced_logging",
+    "app.core.settings"
+  ],
+  "app\\services\\conversation\\conversation_service.py": [
+    "app.repositories.conversation_repository"
+  ],
+  "app\\services\\delta\\delta_service.py": [
+    "app.repositories.sharepoint_delta_state_repository",
+    "app.services.sharepoint.sharepoint_service"
+  ],
+  "app\\services\\ingestion\\chunk_processor.py": [
+    "app.services.ingestion.sensitivity_classifier"
+  ],
+  "app\\services\\ingestion\\ingest_cv.py": [
+    "app.core.not_found_exception",
+    "app.core.settings",
+    "app.models.recruitment_campaign"
+  ],
+  "app\\services\\ingestion\\sensitivity_classifier.py": [
+    "app.repositories.sensitivity_repository",
+    "app.services.llm.azure_openai_service",
+    "app.services.prompt.prompt_builder"
+  ],
+  "app\\services\\llm\\azure_openai_service.py": [
+    "app.core.settings"
+  ],
+  "app\\services\\llm\\base_llm.py": [],
+  "app\\services\\llm\\gemini_service.py": [
+    "app.core.settings",
+    "app.services.llm.base_llm"
+  ],
+  "app\\services\\llm\\groq_service.py": [
+    "app.core.settings",
+    "app.services.llm.base_llm"
+  ],
+  "app\\services\\llm\\model_service.py": [
+    "app.core.bad_request_exception",
+    "app.core.not_found_exception",
+    "app.models.ai_model",
+    "app.repositories.ai_model_repository",
+    "app.schemas.create_ai_model_request",
+    "app.schemas.get_ai_model_paged_request",
+    "app.schemas.update_ai_model_active_request",
+    "app.schemas.update_ai_model_request"
+  ],
+  "app\\services\\llm\\openai_service.py": [
+    "app.core.settings",
+    "app.services.llm.base_llm"
+  ],
+  "app\\services\\llm\\openrouter_service.py": [
+    "app.core.settings",
+    "app.services.llm.base_llm"
+  ],
+  "app\\services\\llm\\response_parser.py": [],
+  "app\\services\\meeting\\meeting_service.py": [
+    "app.repositories.meeting_analysis_repository",
+    "app.repositories.meeting_transcript_repository"
+  ],
+  "app\\services\\message\\message_service.py": [
+    "app.repositories.message_repository"
+  ],
+  "app\\services\\prompt\\ai_prompt_service.py": [
+    "app.core.not_found_exception",
+    "app.models.ai_prompt",
+    "app.repositories.ai_prompt_repository",
+    "app.schemas.create_ai_prompt_request",
+    "app.schemas.get_ai_prompt_paged_request",
+    "app.schemas.update_ai_prompt_request"
+  ],
+  "app\\services\\prompt\\prompt_builder.py": [
+    "app.prompts.sensitivity_prompt"
+  ],
+  "app\\services\\prompt\\prompt_builder_azure.py": [],
+  "app\\services\\rag\\rag_service.py": [
+    "app.enums.prompt_code",
+    "app.repositories.ai_model_repository",
+    "app.repositories.ai_prompt_repository",
+    "app.repositories.rag_config_repository",
+    "app.services.llm.azure_openai_service",
+    "app.services.session_memory.session_memory_service"
+  ],
+  "app\\services\\rag_config\\rag_config_service.py": [
+    "app.repositories.rag_config_repository"
+  ],
+  "app\\services\\recruitment\\analyze_candidate_service.py": [
+    "app.core.not_found_exception",
+    "app.enums.prompt_code",
+    "app.repositories.ai_model_repository",
+    "app.repositories.ai_prompt_repository",
+    "app.repositories.rag_config_repository",
+    "app.repositories.recruitment_campaign_repository",
+    "app.repositories.recruitment_candidate_repository",
+    "app.repositories.recruitment_candidate_result_repository",
+    "app.services.llm.azure_openai_service",
+    "app.services.prompt.prompt_builder_azure",
+    "app.utils.extract.document_extraction",
+    "app.utils.storage.supabase_storage"
+  ],
+  "app\\services\\recruitment\\recruitment_campaign_service.py": [
+    "app.core.not_found_exception",
+    "app.repositories.recruitment_campaign_repository",
+    "app.schemas.recruitment_schema"
+  ],
+  "app\\services\\recruitment\\recruitment_service.py": [
+    "app.core.not_found_exception",
+    "app.enums.prompt_code",
+    "app.repositories.ai_model_repository",
+    "app.repositories.rag_config_repository",
+    "app.repositories.recruitment_campaign_repository",
+    "app.services.llm.azure_openai_service"
+  ],
+  "app\\services\\recruitment\\upload_candidate.py": [
+    "app.core.bad_request_exception",
+    "app.repositories.recruitment_candidate_repository",
+    "app.utils.storage.supabase_storage"
+  ],
+  "app\\services\\review\\review_ai_service.py": [
+    "app.core.not_found_exception",
+    "app.enums.prompt_code",
+    "app.repositories.ai_model_repository",
+    "app.repositories.ai_prompt_repository",
+    "app.repositories.rag_config_repository",
+    "app.services.llm.azure_openai_service",
+    "app.services.prompt.prompt_builder_azure",
+    "app.utils.extract.document_intelligent"
+  ],
+  "app\\services\\review\\review_service.py": [
+    "app.core.not_found_exception",
+    "app.enums.review_job_status",
+    "app.enums.review_task_status",
+    "app.models.review_job",
+    "app.models.review_task",
+    "app.repositories.ai_model_repository",
+    "app.repositories.review_job_repository",
+    "app.repositories.review_task_repository",
+    "app.schemas.create_review_request",
+    "app.schemas.review_dto",
+    "app.services.review.review_ai_service",
+    "app.services.temp.temp_file_service"
+  ],
+  "app\\services\\rewrite_service\\query_rewrite_service.py": [
+    "app.core.settings"
+  ],
+  "app\\services\\session_memory\\session_memory_service.py": [
+    "app.repositories.message_repository"
+  ],
+  "app\\services\\sharepoint\\azure_project_tracking_service.py": [
+    "app.core.settings",
+    "app.services.sharepoint.sharepoint_service"
+  ],
+  "app\\services\\sharepoint\\project_tracking_ai_service.py": [
+    "app.core.settings",
+    "app.enums.prompt_code",
+    "app.repositories.ai_model_repository",
+    "app.repositories.ai_prompt_repository",
+    "app.repositories.rag_config_repository",
+    "app.services.llm.azure_openai_service"
+  ],
+  "app\\services\\sharepoint\\project_tracking_reader_service.py": [
+    "app.services.sharepoint.azure_project_tracking_service",
+    "app.services.sharepoint.sharepoint_service"
+  ],
+  "app\\services\\sharepoint\\project_tracking_sync_service.py": [
+    "app.models.project_tracking_dashboard",
+    "app.models.project_tracking_raw",
+    "app.repositories.project_tracking_dashboard_repository",
+    "app.repositories.project_tracking_raw_repository",
+    "app.services.sharepoint.azure_project_tracking_service",
+    "app.services.sharepoint.project_tracking_ai_service",
+    "app.services.sharepoint.project_tracking_reader_service"
+  ],
+  "app\\services\\sharepoint\\sharepoint_service.py": [
+    "app.core.settings"
+  ],
+  "app\\services\\sharepoint\\sharepoint_sync_service.py": [
+    "app.core.settings",
+    "app.services.sync_jobs.sync_state"
+  ],
+  "app\\services\\sync_jobs\\sync_job_service.py": [
+    "app.models.sync_jobs",
+    "app.repositories.sync_job_repository"
+  ],
+  "app\\services\\sync_jobs\\sync_state.py": [],
+  "app\\services\\task\\tracking_task_service.py": [
+    "app.core.settings",
+    "app.enums.prompt_code",
+    "app.repositories.ai_model_repository",
+    "app.repositories.ai_prompt_repository",
+    "app.repositories.project_tracking_raw_repository",
+    "app.repositories.rag_config_repository",
+    "app.services.llm.azure_openai_service"
+  ],
+  "app\\services\\temp\\temp_file_service.py": [
+    "app.enums.review_constants",
+    "app.enums.temp_file_result"
+  ],
+  "app\\services\\workspace\\workspace_service.py": [
+    "app.core.not_found_exception",
+    "app.repositories.workspace_source_config_repository"
+  ],
+  "app\\shared\\queue\\local_queue_provider.py": [
+    "app.shared.queue.queue_provider",
+    "app.utils.queue.queue_manager",
+    "app.utils.queue.queue_message"
+  ],
+  "app\\shared\\queue\\queue_provider.py": [
+    "app.utils.queue.queue_message"
+  ],
+  "app\\startup\\queue_consumer.py": [
+    "app.workers.review_worker"
+  ],
+  "app\\utils\\extract\\document_extraction.py": [],
+  "app\\utils\\extract\\document_intelligent.py": [
+    "app.core.settings"
+  ],
+  "app\\utils\\queue\\local_queue.py": [],
+  "app\\utils\\queue\\queue_manager.py": [
+    "app.utils.queue.local_queue"
+  ],
+  "app\\utils\\queue\\queue_message.py": [],
+  "app\\utils\\storage\\supabase_storage.py": [
+    "app.core.settings"
+  ],
+  "app\\workers\\meeting_analysis_worker.py": [
+    "app.core.database",
+    "app.services.azure.meeting_analysis_service"
+  ],
+  "app\\workers\\project_tracking_worker.py": [
+    "app.core.database",
+    "app.services.sharepoint.project_tracking_sync_service"
+  ],
+  "app\\workers\\review_worker.py": [
+    "app.core.database",
+    "app.enums.review_job_status",
+    "app.enums.review_queue",
+    "app.enums.review_task_status",
+    "app.repositories.review_job_repository",
+    "app.repositories.review_task_repository",
+    "app.review.messages.review_task_message",
+    "app.services.review.review_ai_service",
+    "app.shared.queue.local_queue_provider"
+  ],
+  "app\\workers\\sharepoint_delta_worker.py": [
+    "app.core.database",
+    "app.services.delta.delta_service",
+    "app.services.sharepoint.sharepoint_service",
+    "app.services.sharepoint.sharepoint_sync_service"
+  ]
+}

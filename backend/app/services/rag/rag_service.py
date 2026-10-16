@@ -5,30 +5,28 @@ from app.enums.prompt_code import (
     PromptCode,
 )
 
-from app.repositories.ai_model_repository import (
-    AIModelRepository,
-)
-
-from app.repositories.ai_prompt_repository import (
-    AIPromptRepository,
-)
-
 from app.services.llm.azure_openai_service import (
-    AzureOpenAIService,
+    get_shared_azure_openai_service,
 )
 
 from app.services.session_memory.session_memory_service import (
     SessionMemoryService,
 )
 
-from app.enums.prompt_code import ( PromptCode)
-from app.repositories.rag_config_repository import WorkspaceConfigRepository
+from app.services.rag.chat_config_cache import ChatConfigCache
 
+
+CHAT_MODES = (
+    PromptCode.PUBLIC,
+    PromptCode.INTERNAL,
+    PromptCode.COMBINE,
+)
 
 class RagService:
 
     def __init__(self):
-        self.llm = AzureOpenAIService()
+
+        self.llm = get_shared_azure_openai_service()
 
     async def ask(
         self,
@@ -40,65 +38,10 @@ class RagService:
         mode: PromptCode,
         workspace_code: str,
     ):
-        chat_params = await self._build_chat_params(
-            db=db,
-            conversation_id=conversation_id,
-            question=question,
-            chunks=chunks,
-            model_id=model_id,
-            mode=mode,
-            workspace_code=workspace_code,
-        )
-        
 
-        answer = await self.llm.chat(
-            model=chat_params["model"],
-            messages=chat_params["messages"],
-            temperature=chat_params["temperature"],
-            max_completion_tokens=chat_params["max_tokens"],
-        )
-
-        return answer
-
-    async def ask_stream(
-        self,
-        db,
-        conversation_id: UUID,
-        question: str,
-        chunks: list,
-        model_id: UUID,
-        mode: PromptCode,
-        workspace_code: str,
-    ) -> AsyncIterator[str]:
-
-        chat_params = await self._build_chat_params(
-            db=db,
-            conversation_id=conversation_id,
-            question=question,
-            chunks=chunks,
-            model_id=model_id,
-            mode=mode,
-            workspace_code=workspace_code,
-        )
-
-        async for token in self.llm.chat_stream(
-            model=chat_params["model"],
-            messages=chat_params["messages"],
-            temperature=chat_params["temperature"],
-            max_completion_tokens=chat_params["max_tokens"],
-        ):
-            yield token
-
-    async def _build_chat_params(
-        self,
-        db,
-        conversation_id: UUID,
-        question: str,
-        chunks: list,
-        model_id: UUID,
-        mode: PromptCode,
-        workspace_code: str,
-    ):
+        #
+        # Teams bot vẫn dùng history hội thoại
+        #
 
         history = await (
             SessionMemoryService
@@ -108,47 +51,118 @@ class RagService:
             )
         )
 
-        if mode not in [
-            PromptCode.PUBLIC,
-            PromptCode.INTERNAL,
-            PromptCode.COMBINE,
-        ]:
-
-            raise Exception("Invalid chat mode.")
-
-        prompt = await AIPromptRepository.get_by_code(
+        chat_config = await self.load_chat_config(
             db=db,
-            code=mode,
+            model_id=model_id,
+            mode=mode,
+            workspace_code=workspace_code,
         )
 
-        if prompt is None:
-            raise Exception("Prompt not found.")
-
-        model = await (
-            AIModelRepository
-            .get_by_id(
-                db=db,
-                id=model_id,
-            )
+        answer = await self.llm.chat(
+            model=chat_config["model"],
+            messages=self.build_messages(
+                chat_config=chat_config,
+                question=question,
+                chunks=chunks,
+                history=history,
+            ),
+            temperature=chat_config["temperature"],
+            max_completion_tokens=chat_config["max_tokens"],
         )
 
-        if model is None:
-            raise Exception(
+        return answer
+
+    async def ask_stream(
+        self,
+        chat_config: dict,
+        question: str,
+        chunks: list,
+    ) -> AsyncIterator[str]:
+
+        async for token in self.llm.chat_stream(
+            model=chat_config["model"],
+            messages=self.build_messages(
+                chat_config=chat_config,
+                question=question,
+                chunks=chunks,
+            ),
+            temperature=chat_config["temperature"],
+            max_completion_tokens=chat_config["max_tokens"],
+        ):
+
+            yield token
+
+    async def load_chat_config(
+        self,
+        db,
+        model_id: UUID,
+        mode: PromptCode,
+        workspace_code: str,
+    ) -> dict:
+
+        #
+        # Đọc từ cache trong RAM, không chạm DB ở đường nóng.
+        # Tham số db giữ lại để không đổi chữ ký hàm.
+        #
+
+        if mode not in CHAT_MODES:
+
+            raise ValueError("Invalid chat mode.")
+
+        system_prompt = await ChatConfigCache.lookup(
+            "prompts",
+            mode.value,
+        )
+
+        if system_prompt is None:
+
+            raise LookupError("Prompt not found.")
+
+        model_name = await ChatConfigCache.lookup(
+            "models",
+            str(model_id),
+        )
+
+        if model_name is None:
+
+            raise LookupError(
                 "AI Model not found."
             )
 
-        contexts = []
+        model_config = await ChatConfigCache.lookup(
+            "model_configs",
+            workspace_code,
+        )
 
-        for chunk in chunks:
+        if model_config is None:
 
-            contexts.append(
-                chunk["content"]
+            raise LookupError(
+                "Model config not found."
             )
 
-        context = "\n\n".join(contexts)
+        return {
+            "model": model_name,
+            "system_prompt": system_prompt,
+            "temperature": model_config["temperature"],
+            "max_tokens": model_config["max_tokens"],
+        }
+
+    @staticmethod
+    def build_messages(
+        chat_config: dict,
+        question: str,
+        chunks: list,
+        history: str = "",
+    ) -> list[dict]:
+
+        context = "\n\n".join(
+            chunk["content"]
+            for chunk in chunks
+            if chunk.get("content")
+        )
 
         system_prompt = (
-            prompt.system_prompt
+            chat_config["system_prompt"]
             .replace(
                 "{{history}}",
                 history or "",
@@ -157,9 +171,13 @@ class RagService:
                 "{{context}}",
                 context,
             )
+            .replace(
+                "{{question}}",
+                question,
+            )
         )
 
-        messages = [
+        return [
             {
                 "role": "system",
                 "content": system_prompt,
@@ -169,22 +187,3 @@ class RagService:
                 "content": question,
             },
         ]
-
-        model_config = await (
-            WorkspaceConfigRepository
-            .get_model_config_by_workspace_code(
-                db=db,
-                workspace_code=workspace_code,
-            )
-        )
-
-        return {
-            "model": model.model_name,
-            "messages": messages,
-            "temperature": float(
-                model_config.temperature
-            ),
-            "max_tokens": int(
-                model_config.max_tokens
-            ),
-        }

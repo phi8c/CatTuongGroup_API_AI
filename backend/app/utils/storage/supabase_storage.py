@@ -12,10 +12,16 @@ class SupabaseStorage:
 
     BUCKET = "documents"
 
-    _client = create_client(
-        settings.SUPABASE_URL,
-        settings.SUPABASE_ANON_KEY,
-    )
+    _client = None
+
+    @classmethod
+    def _get_client(cls):
+        if cls._client is None:
+            cls._client = create_client(
+                settings.SUPABASE_URL,
+                settings.SUPABASE_ANON_KEY,
+            )
+        return cls._client
 
     @classmethod
     async def upload_cv(
@@ -31,7 +37,7 @@ class SupabaseStorage:
             f"cv/{uuid4()}{extension}"
         )
 
-        cls._client.storage.from_(
+        cls._get_client().storage.from_(
             cls.BUCKET
         ).upload(
             path=storage_path,
@@ -50,7 +56,7 @@ class SupabaseStorage:
         file_path: str,
     ) -> bytes:
 
-        return cls._client.storage.from_(
+        return cls._get_client().storage.from_(
             cls.BUCKET
         ).download(
             file_path
@@ -62,7 +68,7 @@ class SupabaseStorage:
         file_path: str,
     ) -> None:
 
-        cls._client.storage.from_(
+        cls._get_client().storage.from_(
             cls.BUCKET
         ).remove(
             [file_path]

@@ -16,9 +16,6 @@ from app.repositories.ai_prompt_repository import (
     AIPromptRepository,
 )
 
-from app.services.llm.ollama_service import (
-    OllamaService,
-)
 
 from app.services.llm.azure_openai_service import (
     AzureOpenAIService,

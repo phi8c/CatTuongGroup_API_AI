@@ -41,12 +41,18 @@ class DocumentExtractor:
         ".docx",
     }
 
-    _client = DocumentIntelligenceClient(
-        endpoint=settings.AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT,
-        credential=AzureKeyCredential(
-            settings.AZURE_DOCUMENT_INTELLIGENCE_KEY,
-        ),
-    )
+    _client = None
+
+    @classmethod
+    def _get_client(cls):
+        if cls._client is None:
+            cls._client = DocumentIntelligenceClient(
+                endpoint=settings.AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT,
+                credential=AzureKeyCredential(
+                    settings.AZURE_DOCUMENT_INTELLIGENCE_KEY,
+                ),
+            )
+        return cls._client
 
     @staticmethod
     def extract(
@@ -68,7 +74,7 @@ class DocumentExtractor:
             )
 
         with path.open("rb") as file:
-            poller = DocumentExtractor._client.begin_analyze_document(
+            poller = DocumentExtractor._get_client().begin_analyze_document(
                 model_id="prebuilt-layout",
                 body=file,
             )

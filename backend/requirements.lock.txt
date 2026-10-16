@@ -17,18 +17,11 @@ azure-ai-documentintelligence==1.0.2
 azure-core==1.41.0
 azure-identity==1.25.3
 azure-search-documents==12.0.0
-bcrypt==5.0.0
 beautifulsoup4==4.15.0
-botbuilder-core==4.17.1
-botbuilder-integration-aiohttp==4.17.1
-botbuilder-schema==4.17.1
-botframework-connector==4.17.1
-botframework-streaming==4.17.1
 certifi==2026.4.22
 cffi==2.0.0
 charset-normalizer==3.4.7
 click==8.4.1
-cohere==7.0.4
 colorama==0.4.6
 colorlog==6.11.0
 cryptography==48.0.0
@@ -91,9 +84,6 @@ markdown-it-py==4.2.0
 marko==2.2.3
 MarkupSafe==3.0.3
 mdurl==0.1.2
-microsoft-agents-activity==1.1.0
-microsoft-agents-copilotstudio-client==1.1.0
-microsoft-agents-hosting-core==1.1.0
 mpire==2.10.2
 mpmath==1.3.0
 msal==1.36.0
@@ -113,7 +103,6 @@ opentelemetry-sdk==1.43.0
 opentelemetry-semantic-conventions==0.64b0
 packaging==26.2
 pandas==2.3.3
-passlib==1.7.4
 pgvector==0.4.2
 pillow==12.3.0
 pluggy==1.6.0
@@ -139,7 +128,6 @@ pypdfium2==5.12.1
 python-dateutil==2.9.0.post0
 python-docx==1.2.0
 python-dotenv==1.2.2
-python-jose==3.5.0
 python-multipart==0.0.32
 python-pptx==1.0.2
 pytz==2026.2
