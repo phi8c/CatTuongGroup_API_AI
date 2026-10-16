@@ -75,6 +75,10 @@ desktop.ini
 $RECYCLE.BIN/
 *.lnk
 
+
+# Local database and SQL files
+/database/
+
 # Runtime logs
 *.log
 logs/

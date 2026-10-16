@@ -1,14 +1,13 @@
-from google import genai
-
-from openai import AsyncOpenAI
-
-from groq import AsyncGroq
+import logging
 
 from app.core.settings import settings
+from app.services.llm.azure_openai_service import get_shared_azure_openai_service
+
+
+logger = logging.getLogger(__name__)
 
 
 class QueryRewriteService:
-
     PROMPT = """
 Bạn là bộ máy rewrite câu hỏi cho hệ thống RAG.
 
@@ -28,119 +27,17 @@ Question:
 """
 
     @staticmethod
-    async def rewrite(
-        history: str,
-        question: str
-    ) -> str:
-
-        prompt = (
-            QueryRewriteService.PROMPT
-            .format(
-                history=history,
-                question=question
-            )
+    async def rewrite(history: str, question: str) -> str:
+        prompt = QueryRewriteService.PROMPT.format(
+            history=history,
+            question=question,
         )
-
-        #
-        # GEMINI
-        #
-
         try:
-
-            client = genai.Client(
-                api_key=
-                settings.GEMINI_API_KEY
+            result = await get_shared_azure_openai_service().generate(
+                model=settings.AZURE_OPENAI_REWRITE_DEPLOYMENT,
+                prompt=prompt,
             )
-
-            response = client.models.generate_content(
-                model="gemini-2.0-flash",
-                contents=prompt
-            )
-
-            return response.text.strip()
-
-        except Exception as e:
-
-            print(
-                "Gemini failed",
-                str(e)
-            )
-
-        #
-        # OPENAI
-        #
-
-        try:
-
-            client = AsyncOpenAI(
-                api_key=
-                settings.OPENAI_API_KEY
-            )
-
-            response = await (
-                client.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=[
-                        {
-                            "role": "user",
-                            "content": prompt
-                        }
-                    ]
-                )
-            )
-
-            return (
-                response
-                .choices[0]
-                .message
-                .content
-                .strip()
-            )
-
-        except Exception as e:
-
-            print(
-                "OpenAI failed",
-                str(e)
-            )
-
-        #
-        # GROQ
-        #
-
-        try:
-
-            client = AsyncGroq(
-                api_key=
-                settings.GROQ_API_KEY
-            )
-
-            response = await (
-                client.chat.completions.create(
-                    model=
-                    "llama-3.3-70b-versatile",
-                    messages=[
-                        {
-                            "role": "user",
-                            "content": prompt
-                        }
-                    ]
-                )
-            )
-
-            return (
-                response
-                .choices[0]
-                .message
-                .content
-                .strip()
-            )
-
-        except Exception as e:
-
-            print(
-                "Groq failed",
-                str(e)
-            )
-
-        return question
+            return result.strip() or question
+        except Exception:
+            logger.exception("Azure query rewrite failed")
+            return question

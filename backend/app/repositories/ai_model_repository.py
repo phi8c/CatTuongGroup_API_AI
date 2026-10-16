@@ -41,6 +41,18 @@ class AIModelRepository:
         )
 
     @staticmethod
+    async def get_first_active(
+        db: AsyncSession,
+    ):
+        query = await db.execute(
+            select(AIModel)
+            .where(AIModel.is_active == True)
+            .order_by(AIModel.display_name.asc(), AIModel.id.asc())
+            .limit(1)
+        )
+        return query.scalar_one_or_none()
+
+    @staticmethod
     async def get_default(
         db: AsyncSession
     ):
@@ -157,4 +169,3 @@ class AIModelRepository:
     
             model.is_active = False
             db.add(model)
-                

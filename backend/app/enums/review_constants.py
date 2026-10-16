@@ -1,3 +1,12 @@
+from enum import IntEnum
+
+
+class ReviewFileLimit(IntEnum):
+
+    MIN = 0
+    MAX_FILE_REVIEW = 5
+
+
 class ReviewConstants:
 
     MAX_FILE_SIZE = 5 * 1024 * 1024

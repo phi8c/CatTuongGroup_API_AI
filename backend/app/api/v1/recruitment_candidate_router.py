@@ -57,7 +57,7 @@ from app.schemas.analyze_candidate_request import (
 from app.services.review.review_service import (
     ReviewService,
 )
-from app.core.settings import settings
+from app.enums.review_constants import ReviewFileLimit
 from app.core.not_found_exception import NotFoundException
 
 router = APIRouter(
@@ -138,16 +138,16 @@ async def create_review(
         job_description=job_description,
     )
     
-    if len(request.files) == settings.MIN:
+    if len(request.files) == ReviewFileLimit.MIN.value:
     
                 raise NotFoundException(
                     "Please upload at least one file.",
                 )
     
-    if len(request.files) > settings.MAX_FILE_REVIEW:
+    if len(request.files) > ReviewFileLimit.MAX_FILE_REVIEW.value:
     
                 raise NotFoundException(
-                    f"Maximum {settings.MAX_FILE_REVIEW} files are allowed.",
+                    f"Maximum {ReviewFileLimit.MAX_FILE_REVIEW.value} files are allowed.",
                 )
     
     
