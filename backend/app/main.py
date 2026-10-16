@@ -4,22 +4,7 @@ from fastapi.responses import JSONResponse
 
 import asyncio
 
-from app.workers.sharepoint_delta_worker import (
-    sharepoint_delta_worker,
-)
-from app.workers.meeting_analysis_worker import (
-    MeetingAnalysisWorker,
-)
 
-from app.api.v1.role_router import router as role_router
-from app.api.v1.tag_router import router as tag_router
-
-from app.api.v1.tag_role_rule_router import (
-    router as tag_role_rule_router
-)
-from app.api.v1.policy_router import (
-    router as policy_router
-)
 from app.api.v1.chunk_router import (
     router as chunk_router
 )
@@ -28,14 +13,6 @@ from app.api.v1.chat_router import (
     router as chat_router
 )
 
-from app.api.v1.permission_router import (
-    router as permission_router
-)
-from app.api.v1.bot_router import (
-
-    router as bot_router
-
-)
 from app.api.v1.conversation_router import (
     router as conversation
 )
@@ -50,13 +27,7 @@ from app.api.v1.model_router import (
     router as model_router
 ) 
 
-from app.api.v1.auth_router import (
-    router as auth_router
-)
 
-from app.api.v1.planner_router import (
-    router as planner_router
-)
 from app.api.v1.prompt_router import (
     router as prompt_router
 )
@@ -64,9 +35,6 @@ from app.api.v1.prompt_router import (
 from app.api.v1.contract_router import (
     router as contract_router)
 
-from app.workers.project_tracking_worker import (
-    ProjectTrackingWorker,
-)
 
 from app.api.v1.workspace_source_config_router import (
     router as workspace_source_config_router,
@@ -86,17 +54,9 @@ from fastapi.middleware.cors import (
 
 )
 
-
-
-from app.startup.queue_consumer import start_queue_consumers
-from app.workers.executive_data_worker import ExecutiveDataWorker
-
-
-
-
-
-
-
+from app.services.azure.azure_search_service import AzureSearchService
+from app.services.rag.chat_config_cache import ChatConfigCache
+from app.services.llm.azure_openai_service import get_shared_azure_openai_service
 
 
 app = FastAPI(
@@ -154,14 +114,37 @@ async def validation_exception_handler(request, exc):
     )
 
 
-# @app.on_event("startup")
-# async def startup():
-#     asyncio.create_task(
-#         sharepoint_delta_worker(),
-#     )
+async def warm_up_chat():
 
-#     await start_queue_consumers()
+    #
+    # Nạp sẵn cấu hình chat + mở kết nối Azure để request đầu không bị chậm
+    #
 
+    try:
+
+        await ChatConfigCache.refresh()
+
+        await AzureSearchService.warm_up()
+
+        # Mở sẵn kết nối của client chat (không tốn token)
+        await get_shared_azure_openai_service()._client.models.list()
+
+        print("chat warm up done")
+
+    except Exception as exc:
+
+        print(
+            "chat warm up error =",
+            repr(exc),
+        )
+
+
+@app.on_event("startup")
+async def start_chat_warm_up():
+
+    asyncio.create_task(
+        warm_up_chat()
+    )
 
 
 app.add_middleware(
@@ -183,83 +166,12 @@ app.add_middleware(
 )
 
 
-
-
-# @app.on_event("startup")
-# async def startup():
-#     asyncio.create_task(
-#         MeetingAnalysisWorker.run(),
-#     )
-
-
-
-
-# @app.on_event("startup")
-# async def startup():
-
-  
-
-#     asyncio.create_task(
-#         ProjectTrackingWorker.run()
-#     )
-
-
-
-# @app.on_event("startup")
-# async def startup():
-#     asyncio.create_task(
-#         sharepoint_delta_worker()
-#     )
-
-
-
-# @app.on_event("startup")
-# async def startup():
-
-#     #
-#     # SharePoint Delta
-#     #
-
-#     asyncio.create_task(
-#         sharepoint_delta_worker(),
-#     )
-
-#     #
-#     # Queue
-#     #
-
-#     await start_queue_consumers()
-
-#     #
-#     # Project Tracking
-#     #
-
-#     asyncio.create_task(
-#         ProjectTrackingWorker.run(),
-#     )
-
-#     #
-#     # Executive Data
-#     #
-
-#     asyncio.create_task(
-#         ExecutiveDataWorker.run(),
-#     )
-
-app.include_router(role_router)
-app.include_router(tag_router)
-app.include_router(tag_role_rule_router)
-app.include_router(policy_router)
 app.include_router(chunk_router)
 app.include_router(chat_router)
-app.include_router(permission_router)
-app.include_router(bot_router)
 app.include_router(conversation)
 app.include_router(document_router)
 app.include_router(recruitment_candidate_router)
 app.include_router(model_router)
-app.include_router(auth_router)
-app.include_router(planner_router)
 app.include_router(prompt_router)
 app.include_router(contract_router)
 app.include_router(workspace_source_config_router)

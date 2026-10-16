@@ -70,8 +70,6 @@ from app.core.database import (
 )
 
 from app.schemas.tracking_chat_request import TrackingChatRequest
-from app.services.govern.executive_data_sync_service import ExecutiveDataSyncService
-from app.schemas.execute_schema import ExecutiveDataRequest, ExecutiveDataChatRequest
 
 
 
@@ -1034,59 +1032,7 @@ async def tracking_chat(
     )
     
     
-@router.post("/executive-data/sync")
-async def sync_executive_data(
     
-    
-    request: ExecutiveDataRequest,
-
-    db: AsyncSession = Depends(
-        get_db,
-    ),
-    
-
-):
-
-    return await (
-
-        ExecutiveDataSyncService
-        .sync_all(
-
-            db=db,
-            model_id=request.model_id,
-            
-
-        )
-
-    )
-    
-@router.post(
-    "/executive-data/chat",
-)
-async def executive_data_chat(
-
-    request: ExecutiveDataChatRequest,
-
-    db: AsyncSession = Depends(
-        get_db,
-    ),
-
-):
-
-    return await (
-
-        ExecutiveDataSyncService
-        .chat(
-
-            db=db,
-
-            question=request.question,
-
-            model_id=request.model_id,
-
-        )
-
-    )
     
     
 @router.get(
