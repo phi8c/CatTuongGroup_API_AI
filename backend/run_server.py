@@ -1,15 +1,41 @@
 
 import os
+import sys
 import multiprocessing
+from pathlib import Path
 
-import uvicorn
+from dotenv import load_dotenv
 
-from app.main import app
+
+def get_base_dir() -> Path:
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+
+    return Path(__file__).resolve().parent
 
 
 def main():
+    # Read .env next to AIBackend.exe
+    base_dir = get_base_dir()
+    env_file = base_dir / ".env"
+
+    load_dotenv(
+        dotenv_path=env_file,
+        override=True,
+    )
+
+    # Import after loading environment variables
+    import uvicorn
+    from app.main import app
+
     host = os.getenv("API_HOST", "127.0.0.1")
     port = int(os.getenv("API_PORT", "18080"))
+
+    print("=" * 50)
+    print("CTG AI Backend")
+    print(f"Environment: {env_file}")
+    print(f"Local URL: http://{host}:{port}")
+    print("=" * 50)
 
     uvicorn.run(
         app,

@@ -22,15 +22,19 @@ jobs:
           python-version: '3.12'
           architecture: 'x64'
 
-      - name: Verify requirements file
+      - name: Verify required files
         working-directory: backend
         run: |
-          if (-not (Test-Path "requirements.lock.txt")) {
-            throw "Missing backend/requirements.lock.txt"
-          }
+          $requiredFiles = @(
+            "requirements.lock.txt",
+            "run_server.py",
+            ".env.example"
+          )
 
-          if (-not (Test-Path "run_server.py")) {
-            throw "Missing backend/run_server.py"
+          foreach ($file in $requiredFiles) {
+            if (-not (Test-Path $file)) {
+              throw "Missing backend/$file"
+            }
           }
 
           Write-Host "Required build files found."
@@ -44,7 +48,7 @@ jobs:
           python -m pip install -r requirements.lock.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-          python -m pip install pyinstaller
+          python -m pip install pyinstaller python-dotenv
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
           python -m pip check
@@ -53,7 +57,7 @@ jobs:
       - name: Verify core dependencies
         working-directory: backend
         run: |
-          python -c "import uvicorn, fastapi, duckdb, sqlalchemy, pydantic_settings; print('Core dependencies OK')"
+          python -c "import uvicorn, fastapi, duckdb, sqlalchemy, pydantic_settings, dotenv; print('Core dependencies OK')"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build executable
@@ -75,6 +79,7 @@ jobs:
             --collect-all docling_core `
             --collect-all docling_parse `
             --collect-all docling_ibm_models `
+            --hidden-import dotenv `
             run_server.py
 
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -85,11 +90,33 @@ jobs:
 
           Write-Host "Executable generated successfully."
 
+      - name: Prepare customer environment
+        working-directory: backend
+        run: |
+          Copy-Item `
+            -Path ".env.example" `
+            -Destination "dist/AIBackend/.env" `
+            -Force
+
+          if (-not (Test-Path "dist/AIBackend/.env")) {
+            throw "Failed to create customer .env"
+          }
+
+          Write-Host "Customer environment template prepared."
+
       - name: Verify executable structure
         working-directory: backend
         run: |
-          if (-not (Test-Path "dist/AIBackend/_internal")) {
-            throw "PyInstaller internal dependencies directory missing"
+          $requiredPaths = @(
+            "dist/AIBackend/AIBackend.exe",
+            "dist/AIBackend/_internal",
+            "dist/AIBackend/.env"
+          )
+
+          foreach ($path in $requiredPaths) {
+            if (-not (Test-Path $path)) {
+              throw "Missing build output: $path"
+            }
           }
 
           Write-Host "Executable structure OK."
@@ -97,7 +124,7 @@ jobs:
       - name: Create ZIP
         run: |
           Compress-Archive `
-            -Path "backend/dist/AIBackend/*" `
+            -Path "backend/dist/AIBackend" `
             -DestinationPath "AI-Backend-Windows.zip" `
             -Force
 
