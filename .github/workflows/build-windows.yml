@@ -7,6 +7,7 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    timeout-minutes: 90
 
     defaults:
       run:
@@ -32,38 +33,78 @@ jobs:
           )
 
           foreach ($file in $requiredFiles) {
-            if (-not (Test-Path $file)) {
+            if (-not (Test-Path -LiteralPath $file -PathType Leaf)) {
               throw "Missing backend/$file"
             }
           }
 
           Write-Host "Required build files found."
 
+      - name: Create isolated Python environment
+        working-directory: backend
+        run: |
+          python -m venv .build-venv
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+          $python = ".\.build-venv\Scripts\python.exe"
+
+          if (-not (Test-Path -LiteralPath $python)) {
+            throw "Virtual environment Python not found"
+          }
+
+          & $python --version
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+          Write-Host "Isolated Python environment created."
+
       - name: Install dependencies
         working-directory: backend
         run: |
-          python -m pip install --upgrade pip
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $python = ".\.build-venv\Scripts\python.exe"
 
-          python -m pip install -r requirements.lock.txt
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & $python -m pip install --upgrade pip
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
 
-          python -m pip install pyinstaller python-dotenv
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & $python -m pip install -r requirements.lock.txt
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
 
-          python -m pip check
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & $python -m pip install pyinstaller
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+          & $python -m pip check
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+          Write-Host "Dependencies installed successfully."
 
       - name: Verify core dependencies
         working-directory: backend
         run: |
-          python -c "import uvicorn, fastapi, duckdb, sqlalchemy, pydantic_settings, dotenv; print('Core dependencies OK')"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $python = ".\.build-venv\Scripts\python.exe"
+
+          & $python -c "import uvicorn, fastapi, duckdb, sqlalchemy, pydantic_settings, dotenv, aiohttp; print('Core dependencies OK')"
+
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
 
       - name: Build executable
         working-directory: backend
         run: |
-          python -m PyInstaller `
+          $python = ".\.build-venv\Scripts\python.exe"
+
+          & $python -m PyInstaller `
             --noconfirm `
             --clean `
             --onedir `
@@ -82,9 +123,11 @@ jobs:
             --hidden-import dotenv `
             run_server.py
 
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
 
-          if (-not (Test-Path "dist/AIBackend/AIBackend.exe")) {
+          if (-not (Test-Path -LiteralPath "dist\AIBackend\AIBackend.exe")) {
             throw "AIBackend.exe was not generated"
           }
 
@@ -93,12 +136,15 @@ jobs:
       - name: Prepare customer environment
         working-directory: backend
         run: |
+          $source = ".env.example"
+          $destination = "dist\AIBackend\.env"
+
           Copy-Item `
-            -Path ".env.example" `
-            -Destination "dist/AIBackend/.env" `
+            -LiteralPath $source `
+            -Destination $destination `
             -Force
 
-          if (-not (Test-Path "dist/AIBackend/.env")) {
+          if (-not (Test-Path -LiteralPath $destination)) {
             throw "Failed to create customer .env"
           }
 
@@ -108,32 +154,166 @@ jobs:
         working-directory: backend
         run: |
           $requiredPaths = @(
-            "dist/AIBackend/AIBackend.exe",
-            "dist/AIBackend/_internal",
-            "dist/AIBackend/.env"
+            "dist\AIBackend\AIBackend.exe",
+            "dist\AIBackend\_internal",
+            "dist\AIBackend\.env"
           )
 
           foreach ($path in $requiredPaths) {
-            if (-not (Test-Path $path)) {
+            if (-not (Test-Path -LiteralPath $path)) {
               throw "Missing build output: $path"
             }
           }
 
           Write-Host "Executable structure OK."
 
-      - name: Create ZIP
+      - name: Smoke test Windows executable
+        working-directory: backend
+        env:
+          API_HOST: 127.0.0.1
+          API_PORT: "18080"
+          CHAT_WARMUP_ENABLED: "false"
         run: |
-          Compress-Archive `
-            -Path "backend/dist/AIBackend" `
-            -DestinationPath "AI-Backend-Windows.zip" `
-            -Force
+          $ErrorActionPreference = "Stop"
 
-          if (-not (Test-Path "AI-Backend-Windows.zip")) {
+          $exe = (Resolve-Path "dist\AIBackend\AIBackend.exe").Path
+          $workDir = (Resolve-Path "dist\AIBackend").Path
+
+          $stdout = Join-Path $env:RUNNER_TEMP "aibackend-stdout.log"
+          $stderr = Join-Path $env:RUNNER_TEMP "aibackend-stderr.log"
+
+          $process = $null
+          $success = $false
+
+          try {
+            $process = Start-Process `
+              -FilePath $exe `
+              -WorkingDirectory $workDir `
+              -RedirectStandardOutput $stdout `
+              -RedirectStandardError $stderr `
+              -PassThru
+
+            $url = "http://127.0.0.1:18080/openapi.json"
+
+            for ($attempt = 1; $attempt -le 60; $attempt++) {
+              Start-Sleep -Seconds 2
+
+              $process.Refresh()
+
+              if ($process.HasExited) {
+                throw "AIBackend.exe exited with code $($process.ExitCode)"
+              }
+
+              try {
+                $response = Invoke-WebRequest `
+                  -Uri $url `
+                  -TimeoutSec 3 `
+                  -UseBasicParsing
+
+                if ($response.StatusCode -eq 200) {
+                  $json = $response.Content | ConvertFrom-Json
+
+                  if ($null -ne $json.openapi) {
+                    $success = $true
+                    Write-Host "Smoke test passed: $url"
+                    break
+                  }
+                }
+              }
+              catch {
+                Write-Host "Waiting for backend startup ($attempt/60)"
+              }
+            }
+
+            if (-not $success) {
+              throw "Backend did not become ready within timeout"
+            }
+          }
+          finally {
+            if ($null -ne $process) {
+              $process.Refresh()
+
+              if (-not $process.HasExited) {
+                Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+              }
+            }
+
+            Write-Host "===== STDOUT ====="
+            if (Test-Path -LiteralPath $stdout) {
+              Get-Content -LiteralPath $stdout -Tail 100
+            }
+
+            Write-Host "===== STDERR ====="
+            if (Test-Path -LiteralPath $stderr) {
+              Get-Content -LiteralPath $stderr -Tail 100
+            }
+          }
+
+      - name: Create and verify ZIP
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          Add-Type -AssemblyName System.IO.Compression
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+
+          $sourceDir = (Resolve-Path "backend\dist").Path
+          $zipPath = Join-Path $env:GITHUB_WORKSPACE "AI-Backend-Windows.zip"
+
+          if (Test-Path -LiteralPath $zipPath) {
+            Remove-Item -LiteralPath $zipPath -Force
+          }
+
+          [System.IO.Compression.ZipFile]::CreateFromDirectory(
+            $sourceDir,
+            $zipPath,
+            [System.IO.Compression.CompressionLevel]::Optimal,
+            $false
+          )
+
+          if (-not (Test-Path -LiteralPath $zipPath)) {
             throw "ZIP creation failed"
           }
 
-          $zip = Get-Item "AI-Backend-Windows.zip"
-          Write-Host "ZIP size: $($zip.Length) bytes"
+          $zip = [System.IO.Compression.ZipFile]::OpenRead($zipPath)
+
+          try {
+            $entries = @(
+              $zip.Entries | ForEach-Object {
+                $_.FullName.Replace("\", "/")
+              }
+            )
+
+            $requiredEntries = @(
+              "AIBackend/AIBackend.exe",
+              "AIBackend/.env"
+            )
+
+            foreach ($entry in $requiredEntries) {
+              if ($entries -notcontains $entry) {
+                throw "Missing ZIP entry: $entry"
+              }
+            }
+
+            $internalFiles = @(
+              $entries | Where-Object {
+                $_.StartsWith("AIBackend/_internal/")
+              }
+            )
+
+            if ($internalFiles.Count -eq 0) {
+              throw "Missing _internal dependencies in ZIP"
+            }
+
+            Write-Host "ZIP content verified successfully."
+          }
+          finally {
+            $zip.Dispose()
+          }
+
+          $file = Get-Item -LiteralPath $zipPath
+
+          Write-Host "ZIP: $($file.Name)"
+          Write-Host "Size: $([math]::Round($file.Length / 1MB, 2)) MB"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
