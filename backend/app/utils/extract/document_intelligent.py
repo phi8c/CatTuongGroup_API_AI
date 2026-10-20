@@ -25,6 +25,7 @@ class DocumentExtraction:
     metadata: dict[str, Any]
 
     document: AnalyzeResult
+    markdown: str = ""
 
 
 class DocumentExtractor:
@@ -77,6 +78,7 @@ class DocumentExtractor:
             poller = DocumentExtractor._get_client().begin_analyze_document(
                 model_id="prebuilt-layout",
                 body=file,
+                output_content_format="markdown",
             )
 
             document = poller.result()
@@ -127,6 +129,8 @@ class DocumentExtractor:
             if paragraph["content"]
         )
 
+        text = text or document.content or ""
+
         metadata = {
             "page_count": len(
                 document.pages or []
@@ -151,4 +155,5 @@ class DocumentExtractor:
             tables=tables,
             metadata=metadata,
             document=document,
+            markdown=document.content or text,
         )

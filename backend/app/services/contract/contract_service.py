@@ -2,7 +2,7 @@ import json
 from zipfile import Path
 from pathlib import Path
 
-from app.utils.extract.document_extraction import (
+from app.utils.extract.document_intelligent import (
     DocumentExtraction,
     DocumentExtractor,
 )

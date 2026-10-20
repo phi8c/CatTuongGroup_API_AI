@@ -10,6 +10,8 @@ from fastapi.responses import JSONResponse
 from app.api.v1.chunk_router import router as chunk_router
 from app.api.v1.chat_router import router as chat_router
 from app.api.v1.conversation_router import router as conversation
+from app.api.v1.document_acl_router import router as document_acl_router
+
 from app.api.v1.document_router import router as document_router
 from app.api.v1.recruitment_candidate_router import (
     router as recruitment_candidate_router,
@@ -91,6 +93,7 @@ app.include_router(chunk_router)
 app.include_router(chat_router)
 app.include_router(conversation)
 app.include_router(document_router)
+app.include_router(document_acl_router)
 app.include_router(recruitment_candidate_router)
 app.include_router(model_router)
 app.include_router(prompt_router)
