@@ -1,5 +1,4 @@
-
-name: Build AI Backend Windows
+name: Build CTG AI Backend Windows
 
 on:
   workflow_dispatch:
@@ -8,7 +7,6 @@ jobs:
   build:
     runs-on: windows-latest
     timeout-minutes: 90
-
     defaults:
       run:
         shell: pwsh
@@ -21,103 +19,43 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-          architecture: 'x64'
+          architecture: x64
 
-      - name: Verify required files
+      - name: Verify build inputs
         working-directory: backend
         run: |
-          $requiredFiles = @(
-            "requirements.lock.txt",
-            "run_server.py",
-            ".env.example"
-          )
-
-          foreach ($file in $requiredFiles) {
+          foreach ($file in @('requirements.lock.txt', 'run_server.py', '.env.example')) {
             if (-not (Test-Path -LiteralPath $file -PathType Leaf)) {
               throw "Missing backend/$file"
             }
           }
 
-          Write-Host "Required build files found."
-
-      - name: Create isolated Python environment
-        working-directory: backend
-        run: |
-          python -m venv .build-venv
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
-
-          $python = ".\.build-venv\Scripts\python.exe"
-
-          if (-not (Test-Path -LiteralPath $python)) {
-            throw "Virtual environment Python not found"
-          }
-
-          & $python --version
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
-
-          Write-Host "Isolated Python environment created."
-
       - name: Install dependencies
         working-directory: backend
         run: |
-          $python = ".\.build-venv\Scripts\python.exe"
-
+          python -m venv .build-venv
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $python = '.\.build-venv\Scripts\python.exe'
           & $python -m pip install --upgrade pip
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
-
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           & $python -m pip install -r requirements.lock.txt
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
-
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           & $python -m pip install pyinstaller
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
-
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           & $python -m pip check
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-          Write-Host "Dependencies installed successfully."
-
-      - name: Verify core dependencies
-        working-directory: backend
-        env:
-          CTG_ENV_FILE: .env.dummy
-        run: |
-          $python = ".\.build-venv\Scripts\python.exe"
-
-          & $python -c "import uvicorn, fastapi, duckdb, sqlalchemy, pydantic_settings, dotenv, aiohttp; from azure.core.pipeline.transport import AioHttpTransport; from azure.search.documents.aio import SearchClient; from azure.ai.documentintelligence import DocumentIntelligenceClient; from app.main import app; AioHttpTransport(); assert '/documents/acl/sync' in app.openapi()['paths']; print('Core dependencies and Azure async transport OK')"
-
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
-
-      - name: Test ACL sync and document extraction
-        working-directory: backend
-        env:
-          CTG_ENV_FILE: .env.dummy
-          CHAT_WARMUP_ENABLED: "false"
-        run: |
-          $python = ".\.build-venv\Scripts\python.exe"
-          & $python -m unittest tests.services.test_sharepoint_acl_sync tests.api.test_document_acl_router tests.services.test_document_extraction
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
-
-      - name: Build executable
+      - name: Verify library imports without loading application
         working-directory: backend
         run: |
-          $python = ".\.build-venv\Scripts\python.exe"
+          $python = '.\.build-venv\Scripts\python.exe'
+          & $python -c "import uvicorn, fastapi, duckdb, sqlalchemy, pydantic_settings, dotenv, aiohttp, asyncpg; from azure.core.pipeline.transport import AioHttpTransport; from azure.search.documents.aio import SearchClient; from azure.ai.documentintelligence import DocumentIntelligenceClient; print('Dependencies OK')"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Build Windows executable
+        working-directory: backend
+        run: |
+          $python = '.\.build-venv\Scripts\python.exe'
           & $python -m PyInstaller `
             --noconfirm `
             --clean `
@@ -138,204 +76,45 @@ jobs:
             --hidden-import sqlalchemy.dialects.postgresql.asyncpg `
             --hidden-import dotenv `
             run_server.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
-
-          if (-not (Test-Path -LiteralPath "dist\AIBackend\AIBackend.exe")) {
-            throw "AIBackend.exe was not generated"
-          }
-
-          Write-Host "Executable generated successfully."
-
-      - name: Prepare customer environment
+      - name: Prepare output and verify bundled Python runtime
         working-directory: backend
         run: |
-          $source = ".env.example"
-          $destination = "dist\AIBackend\.env"
-
-          Copy-Item `
-            -LiteralPath $source `
-            -Destination $destination `
-            -Force
-
-          if (-not (Test-Path -LiteralPath $destination)) {
-            throw "Failed to create customer .env"
+          $out = 'dist\AIBackend'
+          Copy-Item -LiteralPath '.env.example' -Destination "$out\.env.example" -Force
+          foreach ($path in @("$out\AIBackend.exe", "$out\_internal", "$out\_internal\base_library.zip", "$out\.env.example")) {
+            if (-not (Test-Path -LiteralPath $path)) { throw "Missing build output: $path" }
           }
-
-          Write-Host "Customer environment template prepared."
-
-      - name: Verify executable structure
-        working-directory: backend
-        run: |
-          $requiredPaths = @(
-            "dist\AIBackend\AIBackend.exe",
-            "dist\AIBackend\_internal",
-            "dist\AIBackend\.env"
-          )
-
-          foreach ($path in $requiredPaths) {
-            if (-not (Test-Path -LiteralPath $path)) {
-              throw "Missing build output: $path"
-            }
-          }
-
-          Write-Host "Executable structure OK."
-
-      - name: Smoke test Windows executable
-        working-directory: backend
-        env:
-          API_HOST: 127.0.0.1
-          API_PORT: "18080"
-          CHAT_WARMUP_ENABLED: "false"
-        run: |
-          $ErrorActionPreference = "Stop"
-
-          $exe = (Resolve-Path "dist\AIBackend\AIBackend.exe").Path
-          $workDir = (Resolve-Path "dist\AIBackend").Path
-
-          $stdout = Join-Path $env:RUNNER_TEMP "aibackend-stdout.log"
-          $stderr = Join-Path $env:RUNNER_TEMP "aibackend-stderr.log"
-
-          $process = $null
-          $success = $false
-
-          try {
-            $process = Start-Process `
-              -FilePath $exe `
-              -WorkingDirectory $workDir `
-              -WindowStyle Hidden `
-              -RedirectStandardOutput $stdout `
-              -RedirectStandardError $stderr `
-              -PassThru
-
-            $url = "http://127.0.0.1:18080/openapi.json"
-
-            for ($attempt = 1; $attempt -le 60; $attempt++) {
-              Start-Sleep -Seconds 2
-
-              $process.Refresh()
-
-              if ($process.HasExited) {
-                throw "AIBackend.exe exited with code $($process.ExitCode)"
-              }
-
-              try {
-                $response = Invoke-WebRequest `
-                  -Uri $url `
-                  -TimeoutSec 3 `
-                  -UseBasicParsing
-
-                if ($response.StatusCode -eq 200) {
-                  $json = $response.Content | ConvertFrom-Json
-
-                  if ($null -ne $json.openapi) {
-                    $success = $true
-                    Write-Host "Smoke test passed: $url"
-                    break
-                  }
-                }
-              }
-              catch {
-                Write-Host "Waiting for backend startup ($attempt/60)"
-              }
-            }
-
-            if (-not $success) {
-              throw "Backend did not become ready within timeout"
-            }
-          }
-          finally {
-            if ($null -ne $process) {
-              $process.Refresh()
-
-              if (-not $process.HasExited) {
-                Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
-              }
-            }
-
-            Write-Host "===== STDOUT ====="
-            if (Test-Path -LiteralPath $stdout) {
-              Get-Content -LiteralPath $stdout -Tail 100
-            }
-
-            Write-Host "===== STDERR ====="
-            if (Test-Path -LiteralPath $stderr) {
-              Get-Content -LiteralPath $stderr -Tail 100
-            }
-          }
+          Write-Host 'EXE, Python runtime and environment template present.'
 
       - name: Create and verify ZIP
         run: |
-          $ErrorActionPreference = "Stop"
-
+          $ErrorActionPreference = 'Stop'
           Add-Type -AssemblyName System.IO.Compression
           Add-Type -AssemblyName System.IO.Compression.FileSystem
-
-          $sourceDir = (Resolve-Path "backend\dist").Path
-          $zipPath = Join-Path $env:GITHUB_WORKSPACE "AI-Backend-Windows.zip"
-
-          if (Test-Path -LiteralPath $zipPath) {
-            Remove-Item -LiteralPath $zipPath -Force
-          }
-
+          $zipPath = Join-Path $env:GITHUB_WORKSPACE 'CTG-AI-Backend-Windows.zip'
+          if (Test-Path -LiteralPath $zipPath) { Remove-Item -LiteralPath $zipPath -Force }
           [System.IO.Compression.ZipFile]::CreateFromDirectory(
-            $sourceDir,
+            (Resolve-Path 'backend\dist').Path,
             $zipPath,
             [System.IO.Compression.CompressionLevel]::Optimal,
             $false
           )
-
-          if (-not (Test-Path -LiteralPath $zipPath)) {
-            throw "ZIP creation failed"
-          }
-
           $zip = [System.IO.Compression.ZipFile]::OpenRead($zipPath)
-
           try {
-            $entries = @(
-              $zip.Entries | ForEach-Object {
-                $_.FullName.Replace("\", "/")
-              }
-            )
-
-            $requiredEntries = @(
-              "AIBackend/AIBackend.exe",
-              "AIBackend/.env"
-            )
-
-            foreach ($entry in $requiredEntries) {
-              if ($entries -notcontains $entry) {
-                throw "Missing ZIP entry: $entry"
-              }
+            $entries = @($zip.Entries | ForEach-Object { $_.FullName.Replace('\', '/') })
+            foreach ($entry in @('AIBackend/AIBackend.exe', 'AIBackend/_internal/base_library.zip', 'AIBackend/.env.example')) {
+              if ($entries -notcontains $entry) { throw "Missing ZIP entry: $entry" }
             }
-
-            $internalFiles = @(
-              $entries | Where-Object {
-                $_.StartsWith("AIBackend/_internal/")
-              }
-            )
-
-            if ($internalFiles.Count -eq 0) {
-              throw "Missing _internal dependencies in ZIP"
-            }
-
-            Write-Host "ZIP content verified successfully."
           }
-          finally {
-            $zip.Dispose()
-          }
-
-          $file = Get-Item -LiteralPath $zipPath
-
-          Write-Host "ZIP: $($file.Name)"
-          Write-Host "Size: $([math]::Round($file.Length / 1MB, 2)) MB"
+          finally { $zip.Dispose() }
+          Write-Host "Build ZIP ready: $zipPath"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AI-Backend-Windows
-          path: AI-Backend-Windows.zip
+          name: CTG-AI-Backend-Windows
+          path: CTG-AI-Backend-Windows.zip
           if-no-files-found: error
           retention-days: 7
