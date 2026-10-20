@@ -90,11 +90,25 @@ jobs:
 
       - name: Verify core dependencies
         working-directory: backend
+        env:
+          CTG_ENV_FILE: .env.dummy
         run: |
           $python = ".\.build-venv\Scripts\python.exe"
 
-          & $python -c "import uvicorn, fastapi, duckdb, sqlalchemy, pydantic_settings, dotenv, aiohttp; print('Core dependencies OK')"
+          & $python -c "import uvicorn, fastapi, duckdb, sqlalchemy, pydantic_settings, dotenv, aiohttp; from azure.core.pipeline.transport import AioHttpTransport; from azure.search.documents.aio import SearchClient; from azure.ai.documentintelligence import DocumentIntelligenceClient; from app.main import app; AioHttpTransport(); assert '/documents/acl/sync' in app.openapi()['paths']; print('Core dependencies and Azure async transport OK')"
 
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Test ACL sync and document extraction
+        working-directory: backend
+        env:
+          CTG_ENV_FILE: .env.dummy
+          CHAT_WARMUP_ENABLED: "false"
+        run: |
+          $python = ".\.build-venv\Scripts\python.exe"
+          & $python -m unittest tests.services.test_sharepoint_acl_sync tests.api.test_document_acl_router tests.services.test_document_extraction
           if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE
           }
@@ -116,10 +130,12 @@ jobs:
             --collect-all fastapi `
             --collect-all azure `
             --collect-all duckdb `
-            --collect-all docling `
-            --collect-all docling_core `
-            --collect-all docling_parse `
-            --collect-all docling_ibm_models `
+            --collect-all aiohttp `
+            --hidden-import azure.core.pipeline.transport._aiohttp `
+            --hidden-import azure.search.documents.aio `
+            --hidden-import azure.ai.documentintelligence `
+            --hidden-import asyncpg `
+            --hidden-import sqlalchemy.dialects.postgresql.asyncpg `
             --hidden-import dotenv `
             run_server.py
 
@@ -189,6 +205,7 @@ jobs:
             $process = Start-Process `
               -FilePath $exe `
               -WorkingDirectory $workDir `
+              -WindowStyle Hidden `
               -RedirectStandardOutput $stdout `
               -RedirectStandardError $stderr `
               -PassThru
