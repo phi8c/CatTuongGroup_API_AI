@@ -1,25 +1,14 @@
 
-import os
-import sys
-from pathlib import Path
 from uuid import UUID
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-def get_backend_dir() -> Path:
-    if getattr(sys, "frozen", False):
-        return Path(sys.executable).resolve().parent
-
-    return Path(__file__).resolve().parents[2]
+from app.core.environment import get_backend_dir, resolve_env_file
 
 
 BACKEND_DIR = get_backend_dir()
-
-ENV_FILE = Path(os.getenv("CTG_ENV_FILE", ".env"))
-
-if not ENV_FILE.is_absolute():
-    ENV_FILE = BACKEND_DIR / ENV_FILE
+ENV_FILE = resolve_env_file()
 
 
 class Settings(BaseSettings):

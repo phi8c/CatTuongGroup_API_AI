@@ -2,6 +2,10 @@ name: Build CTG AI Backend Windows
 
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/build-windows.yml'
 
 jobs:
   build:
@@ -24,7 +28,7 @@ jobs:
       - name: Verify build inputs
         working-directory: backend
         run: |
-          foreach ($file in @('requirements.lock.txt', 'run_server.py', '.env.example')) {
+          foreach ($file in @('requirements.lock.txt', 'run_server.py', '.env.example', '.env.dummy', 'app/services/temp/temp_file_service.py')) {
             if (-not (Test-Path -LiteralPath $file -PathType Leaf)) {
               throw "Missing backend/$file"
             }
@@ -50,6 +54,16 @@ jobs:
         run: |
           $python = '.\.build-venv\Scripts\python.exe'
           & $python -c "import uvicorn, fastapi, duckdb, sqlalchemy, pydantic_settings, dotenv, aiohttp, asyncpg; from azure.core.pipeline.transport import AioHttpTransport; from azure.search.documents.aio import SearchClient; from azure.ai.documentintelligence import DocumentIntelligenceClient; print('Dependencies OK')"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify local startup with public env templates
+        working-directory: backend
+        env:
+          CTG_ENV_FILE: .env.example
+          CHAT_WARMUP_ENABLED: "false"
+        run: |
+          $python = '.\.build-venv\Scripts\python.exe'
+          & $python -m unittest tests.api.test_local_startup tests.api.test_ai_backend_cleanup
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build Windows executable
@@ -83,6 +97,7 @@ jobs:
         run: |
           $out = 'dist\AIBackend'
           Copy-Item -LiteralPath '.env.example' -Destination "$out\.env.example" -Force
+          Copy-Item -LiteralPath '.env.dummy' -Destination "$out\.env.dummy" -Force
           foreach ($path in @("$out\AIBackend.exe", "$out\_internal", "$out\_internal\base_library.zip", "$out\.env.example")) {
             if (-not (Test-Path -LiteralPath $path)) { throw "Missing build output: $path" }
           }
@@ -110,6 +125,69 @@ jobs:
           }
           finally { $zip.Dispose() }
           Write-Host "Build ZIP ready: $zipPath"
+
+      - name: Smoke test EXE from extracted ZIP without private configuration
+        env:
+          API_HOST: 127.0.0.1
+          API_PORT: "18080"
+          CHAT_WARMUP_ENABLED: "false"
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $extractDir = Join-Path $env:RUNNER_TEMP "ctg-exe-smoke-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          Expand-Archive -LiteralPath 'CTG-AI-Backend-Windows.zip' -DestinationPath $extractDir -Force
+          $exe = Join-Path $extractDir 'AIBackend\AIBackend.exe'
+          # Start outside the application directory to catch relative-path mistakes.
+          foreach ($template in @('', '.env.example', '.env.dummy')) {
+            if ($template) { $env:CTG_ENV_FILE = $template }
+            else { Remove-Item Env:CTG_ENV_FILE -ErrorAction SilentlyContinue }
+            $label = if ($template) { $template.TrimStart('.') } else { 'automatic' }
+            $stdout = Join-Path $env:RUNNER_TEMP "ctg-$label-stdout.log"
+            $stderr = Join-Path $env:RUNNER_TEMP "ctg-$label-stderr.log"
+            $process = $null
+            try {
+              $process = Start-Process -FilePath $exe -WorkingDirectory $env:RUNNER_TEMP -WindowStyle Hidden -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
+              $ready = $false
+              for ($attempt = 1; $attempt -le 45; $attempt++) {
+                Start-Sleep -Seconds 2
+                $process.Refresh()
+                if ($process.HasExited) { throw "EXE exited with code $($process.ExitCode) using $label" }
+                try {
+                  $schema = Invoke-RestMethod -Uri 'http://127.0.0.1:18080/openapi.json' -TimeoutSec 3
+                }
+                catch { continue }
+                if (-not $schema.openapi -or -not $schema.paths.'/documents/acl/sync') {
+                  throw 'EXE OpenAPI is missing the ACL sync endpoint'
+                }
+                $docs = Invoke-WebRequest -Uri 'http://127.0.0.1:18080/docs' -TimeoutSec 3
+                if ($docs.StatusCode -ne 200) { throw 'EXE API docs are unavailable' }
+                $ready = $true
+                break
+              }
+              if (-not $ready) { throw "EXE startup timed out using $label" }
+              Write-Host "Packaged EXE startup passed using $label"
+            }
+            finally {
+              if ($null -ne $process) {
+                $process.Refresh()
+                if (-not $process.HasExited) { Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue }
+              }
+              foreach ($log in @($stdout, $stderr)) {
+                if (Test-Path -LiteralPath $log) { Get-Content -LiteralPath $log -Tail 100 }
+              }
+            }
+          }
+
+      - name: Upload diagnostic logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: CTG-build-diagnostics
+          path: |
+            ${{ runner.temp }}/ctg-*-stdout.log
+            ${{ runner.temp }}/ctg-*-stderr.log
+            backend/build/AIBackend/warn-AIBackend.txt
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4

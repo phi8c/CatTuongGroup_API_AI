@@ -15,13 +15,15 @@ def get_base_dir() -> Path:
 
 
 def main():
-    # Read .env next to AIBackend.exe
+    # Use the same selection as app.core.settings, including local templates.
     base_dir = get_base_dir()
-    env_file = base_dir / ".env"
+    from app.core.environment import resolve_env_file
+
+    env_file = resolve_env_file(base_dir)
 
     load_dotenv(
         dotenv_path=env_file,
-        override=True,
+        override=False,
     )
 
     # Import after loading environment variables

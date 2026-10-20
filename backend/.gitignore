@@ -7,6 +7,7 @@
 .env
 .env.*
 !.env.example
+!.env.dummy
 !.env.sample
 *.env
 *.pem
@@ -88,9 +89,9 @@ log/
 *.pid.lock
 
 # Temporary files / runtime uploads
-tmp/
-temp/
-temporary/
+/tmp/
+/temp/
+/temporary/
 uploads/
 downloads/
 cache/
@@ -149,3 +150,11 @@ backend/review_chunks.json
 !backend/requirements.txt
 !backend/requirements.lock.txt
 !backend/run_server.py
+
+# Build-only virtual environment
+.build-venv/
+
+# Offline generated schema contains no data or credentials
+!/database/
+/database/*
+!/database/ctg_ai_schema.sql
