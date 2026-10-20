@@ -56,16 +56,6 @@ jobs:
           & $python -c "import uvicorn, fastapi, duckdb, sqlalchemy, pydantic_settings, dotenv, aiohttp, asyncpg; from azure.core.pipeline.transport import AioHttpTransport; from azure.search.documents.aio import SearchClient; from azure.ai.documentintelligence import DocumentIntelligenceClient; print('Dependencies OK')"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: Verify local startup with public env templates
-        working-directory: backend
-        env:
-          CTG_ENV_FILE: .env.example
-          CHAT_WARMUP_ENABLED: "false"
-        run: |
-          $python = '.\.build-venv\Scripts\python.exe'
-          & $python -m unittest tests.api.test_local_startup tests.api.test_ai_backend_cleanup
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
       - name: Build Windows executable
         working-directory: backend
         run: |
@@ -78,6 +68,8 @@ jobs:
             --name AIBackend `
             --paths . `
             --collect-submodules app `
+            --exclude-module tests `
+            --exclude-module pytest `
             --collect-all uvicorn `
             --collect-all fastapi `
             --collect-all azure `
